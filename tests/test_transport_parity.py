@@ -39,8 +39,8 @@ async def test_transport_tool_list_parity() -> None:
         http_tools = {t.name: t for t in http_tools_res.tools}
 
     # 3. Assert total tool count and names match exactly
-    assert len(stdio_tools) == 5
-    assert len(http_tools) == 5
+    assert len(stdio_tools) == 6
+    assert len(http_tools) == 6
     assert set(stdio_tools.keys()) == set(http_tools.keys())
 
     # 4. Assert tool descriptions and input schemas match 1:1

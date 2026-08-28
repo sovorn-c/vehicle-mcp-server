@@ -14,6 +14,7 @@ from vehicle_mcp_server.config import ServerConfig
 from vehicle_mcp_server.models import (
     FieldExplanationResult,
     SourceObservationResponse,
+    VehicleCatalogPage,
     VehicleRevisionResponse,
 )
 from vehicle_mcp_server.tools import (
@@ -21,6 +22,7 @@ from vehicle_mcp_server.tools import (
     execute_get_source_observation,
     execute_get_vehicle_history,
     execute_get_vehicle_revision,
+    execute_list_vehicles,
     execute_lookup_vehicle,
 )
 
@@ -48,6 +50,27 @@ def create_server(
         version=resolved_config.server_version,
         lifespan=server_lifespan,
     )
+
+    @server.tool(
+        name="list_vehicles",
+        description=(
+            "List a bounded page of canonical vehicle summaries from the catalog for discovery."
+        ),
+        structured_output=True,
+    )
+    async def list_vehicles(
+        ctx: Context,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> VehicleCatalogPage:
+        pipeline_client: VehiclePipelineClient = ctx.request_context.lifespan_context[
+            "pipeline_client"
+        ]
+        return await execute_list_vehicles(
+            pipeline_client,
+            limit=limit,
+            offset=offset,
+        )
 
     @server.tool(
         name="lookup_vehicle",

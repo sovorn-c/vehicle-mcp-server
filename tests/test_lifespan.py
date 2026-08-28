@@ -25,7 +25,7 @@ async def test_server_lifespan_initializes_and_closes_http_client() -> None:
 
     async with Client(server) as client:
         res = await client.list_tools()
-        assert len(res.tools) == 5
+        assert len(res.tools) == 6
         assert not close_called
 
     # When Client exits and server lifespan terminates, transport/client is closed

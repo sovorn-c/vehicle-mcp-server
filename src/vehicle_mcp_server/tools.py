@@ -24,11 +24,13 @@ from vehicle_mcp_server.models import (
     GetSourceObservationInput,
     GetVehicleHistoryInput,
     GetVehicleRevisionInput,
+    ListVehiclesInput,
     LookupVehicleInput,
     ProvenanceLink,
     SafeError,
     SafeErrorCategory,
     SourceObservationResponse,
+    VehicleCatalogPage,
     VehicleRevisionResponse,
 )
 
@@ -143,6 +145,23 @@ async def execute_lookup_vehicle(
         return await client.get_current_vehicle(validated.vin)
 
     return await safe_tool_boundary("lookup_vehicle", _action)
+
+
+async def execute_list_vehicles(
+    client: VehiclePipelineClient,
+    limit: int = 20,
+    offset: int = 0,
+) -> VehicleCatalogPage:
+    """Execute bounded vehicle catalog discovery query."""
+
+    async def _action() -> VehicleCatalogPage:
+        validated = ListVehiclesInput(limit=limit, offset=offset)
+        return await client.list_vehicles(
+            limit=validated.limit,
+            offset=validated.offset,
+        )
+
+    return await safe_tool_boundary("list_vehicles", _action)
 
 
 async def execute_explain_vehicle_field(
