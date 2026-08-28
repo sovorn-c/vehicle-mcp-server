@@ -37,9 +37,10 @@ def test_github_actions_ci_contract() -> None:
     assert "21024499ec71bc09b33b136de9ca369ca052685b" in content, (
         "ci.yml must pin explicit pipeline ref"
     )
+    assert "contents: read" in content, "ci.yml must enforce least-privilege contents: read"
 
 
-def test_smoke_script_verifies_pipeline_ref() -> None:
+def test_smoke_script_verifies_pipeline_ref_and_isolated_compose() -> None:
     smoke_script = Path("scripts/smoke-local.sh")
     assert smoke_script.exists()
     content = smoke_script.read_text()
@@ -47,4 +48,12 @@ def test_smoke_script_verifies_pipeline_ref() -> None:
     assert "PIPELINE_REF" in content, "smoke-local.sh must support PIPELINE_REF"
     assert "21024499ec71bc09b33b136de9ca369ca052685b" in content, (
         "smoke-local.sh must declare default verified PIPELINE_REF"
+    )
+
+    # Dedicated compose project and volume teardown isolation
+    assert "-p " in content or "PROJECT_NAME" in content, (
+        "smoke-local.sh must use dedicated Compose project name"
+    )
+    assert "down -v" in content or "down --volumes" in content or "-v " in content, (
+        "smoke-local.sh must clean dedicated database volumes"
     )
