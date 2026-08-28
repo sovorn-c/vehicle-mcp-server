@@ -1,4 +1,4 @@
-"""Automated demonstration client exercising all five vehicle intelligence tools."""
+"""Automated demonstration client exercising all six vehicle intelligence tools."""
 
 import asyncio
 import json
@@ -29,33 +29,69 @@ def _extract_tool_payload(result: Any) -> Any:
                         return parsed["result"]
                     return parsed
                 except Exception:
-                    pass
-    if hasattr(result, "model_dump"):
-        return result.model_dump()
-    return result
+                    continue
+    return None
 
 
 async def run_demonstration(
-    stdio_server: Any = None,
+    pipeline_base_url: str = "http://localhost:8000",
     http_url: str = "http://127.0.0.1:8080/mcp",
+    stdio_server: Any = None,
 ) -> None:
-    """Execute real-client demonstration exercising all tools and scenarios."""
+    """Execute end-to-end demonstration exercising all six vehicle intelligence tools."""
     print("==================================================================")
     print(" Vehicle Intelligence MCP Server — End-to-End Demonstration")
     print("==================================================================")
 
     # Resolve stdio server
-    resolved_server = stdio_server or create_server(ServerConfig())
+    resolved_server = stdio_server or create_server(
+        ServerConfig(pipeline_base_url=pipeline_base_url)
+    )
 
-    print("\n[1/7] Initializing stdio transport and verifying tool catalog...")
+    print("\n[1/8] Initializing stdio transport and verifying tool catalog...")
     async with Client(resolved_server) as stdio_client:
         stdio_tools_res = await stdio_client.list_tools()
         stdio_tool_names = sorted([t.name for t in stdio_tools_res.tools])
         print(f"      Stdio tools ({len(stdio_tool_names)}): {', '.join(stdio_tool_names)}")
-        assert len(stdio_tool_names) == 5, f"Expected 5 tools, got {len(stdio_tool_names)}"
+        assert len(stdio_tool_names) == 6, f"Expected 6 tools, got {len(stdio_tool_names)}"
+
+        # Step 2: Catalog Discovery
+        print("\n[2/8] Discovering Canonical Vehicles in Catalog...")
+        cat_res = await stdio_client.call_tool(
+            "list_vehicles",
+            arguments={"limit": 20, "offset": 0},
+        )
+        catalog = _extract_tool_payload(cat_res)
+        assert isinstance(catalog, dict)
+        assert "items" in catalog
+        assert len(catalog["items"]) >= 1, "Catalog must not be empty"
+        print(
+            f"      Discovered {len(catalog['items'])} vehicles "
+            f"(total in catalog: {catalog.get('total', len(catalog['items']))})"
+        )
+
+        # Dynamic selection of conflict vehicle
+        conflict_candidates = [
+            item["vin"] for item in catalog["items"] if item.get("has_conflicts") is True
+        ]
+        assert conflict_candidates, (
+            "Catalog must contain at least one vehicle with has_conflicts=True"
+        )
+        conflict_vin = conflict_candidates[0]
+        print(f"      Selected conflict vehicle from catalog: {conflict_vin}")
+
+        # Dynamic selection of multi-revision temporal vehicle
+        temporal_candidates = [
+            item["vin"] for item in catalog["items"] if item.get("revision_number", 1) >= 2
+        ]
+        assert temporal_candidates, (
+            "Catalog must contain at least one vehicle with revision_number >= 2"
+        )
+        temporal_vin = temporal_candidates[0]
+        print(f"      Selected temporal vehicle from catalog: {temporal_vin}")
 
         # Scenario 1: Clean Vehicle
-        print("\n[2/7] Scenario 1: Clean Vehicle (1HGCR2F85HA000000)")
+        print("\n[3/8] Scenario 1: Clean Vehicle (1HGCR2F85HA000000)")
         res = await stdio_client.call_tool(
             "lookup_vehicle",
             arguments={"vin": "1HGCR2F85HA000000"},
@@ -81,7 +117,7 @@ async def run_demonstration(
         print(f"      Explanation outcome: {exp_data['outcome']} ({exp_data['value']})")
 
         # Scenario 2: Risky Vehicle
-        print("\n[3/7] Scenario 2: Risky Vehicle (1FA6P8CF8H5000000)")
+        print("\n[4/8] Scenario 2: Risky Vehicle (1FA6P8CF8H5000000)")
         res_risky = await stdio_client.call_tool(
             "lookup_vehicle",
             arguments={"vin": "1FA6P8CF8H5000000"},
@@ -104,7 +140,7 @@ async def run_demonstration(
         print(f"      Explanation outcome: {outcome} ({val})")
 
         # Scenario 3: Unknown Vehicle
-        print("\n[4/7] Scenario 3: Unknown Vehicle (JM0BL10F000000000)")
+        print("\n[5/8] Scenario 3: Unknown Vehicle (JM0BL10F000000000)")
         res_unk = await stdio_client.call_tool(
             "lookup_vehicle",
             arguments={"vin": "JM0BL10F000000000"},
@@ -131,10 +167,10 @@ async def run_demonstration(
         print(f"      Absent field explanation: {exp_absent_data['outcome']}")
 
         # Scenario 4: Conflict Vehicle
-        print("\n[5/7] Scenario 4: Conflict Vehicle (WAUZZZ8K7BA000000)")
+        print(f"\n[6/8] Scenario 4: Conflict Vehicle ({conflict_vin})")
         res_conf = await stdio_client.call_tool(
             "lookup_vehicle",
-            arguments={"vin": "WAUZZZ8K7BA000000"},
+            arguments={"vin": conflict_vin},
         )
         conf_data = _extract_tool_payload(res_conf)
         conflict_fields = [c["field_name"] for c in conf_data.get("conflicts", [])]
@@ -143,7 +179,7 @@ async def run_demonstration(
 
         exp_conf = await stdio_client.call_tool(
             "explain_vehicle_field",
-            arguments={"vin": "WAUZZZ8K7BA000000", "field_name": "ppsr_result"},
+            arguments={"vin": conflict_vin, "field_name": "ppsr_result"},
         )
         exp_conf_data = _extract_tool_payload(exp_conf)
         assert exp_conf_data["outcome"] == "UNRESOLVED"
@@ -157,10 +193,10 @@ async def run_demonstration(
         print(f"      Competing values preserved: {competing}")
 
         # Scenario 5: History, Revisions, and Observations
-        print("\n[6/7] Scenario 5: Vehicle History and Revisions (1HGCR2F85HA000000)")
+        print(f"\n[7/8] Scenario 5: Vehicle History and Revisions ({temporal_vin})")
         hist_res = await stdio_client.call_tool(
             "get_vehicle_history",
-            arguments={"vin": "1HGCR2F85HA000000", "limit": 10},
+            arguments={"vin": temporal_vin, "limit": 10},
         )
         hist_data = _extract_tool_payload(hist_res)
         assert isinstance(hist_data, list)
@@ -182,7 +218,7 @@ async def run_demonstration(
         # Point-in-time exact revision 1 retrieval
         rev1_res = await stdio_client.call_tool(
             "get_vehicle_revision",
-            arguments={"vin": "1HGCR2F85HA000000", "revision_number": 1},
+            arguments={"vin": temporal_vin, "revision_number": 1},
         )
         rev1_data = _extract_tool_payload(rev1_res)
         assert rev1_data["revision_number"] == 1
@@ -193,7 +229,7 @@ async def run_demonstration(
         # Point-in-time exact revision 2 retrieval
         rev2_res = await stdio_client.call_tool(
             "get_vehicle_revision",
-            arguments={"vin": "1HGCR2F85HA000000", "revision_number": 2},
+            arguments={"vin": temporal_vin, "revision_number": 2},
         )
         rev2_data = _extract_tool_payload(rev2_res)
         assert rev2_data["revision_number"] == 2
@@ -210,7 +246,7 @@ async def run_demonstration(
             obs_id = prov2_list[0]["observation_id"]
         assert obs_id is not None, "Revision 2 provenance must name the update observation ID!"
 
-        print(f"\n[7/7] Scenario 6: Exact Source Observation ({obs_id})")
+        print(f"\n[8/8] Scenario 6: Exact Source Observation ({obs_id})")
         obs_res = await stdio_client.call_tool(
             "get_source_observation",
             arguments={"observation_id": obs_id},
@@ -238,6 +274,16 @@ async def run_demonstration(
                 http_tool_names = sorted([t.name for t in http_tools_res.tools])
                 assert http_tool_names == stdio_tool_names
                 print(f"      HTTP tools match stdio catalog: {', '.join(http_tool_names)}")
+
+                # Test list_vehicles parity over HTTP
+                h_cat = await http_session.call_tool(
+                    "list_vehicles",
+                    arguments={"limit": 5, "offset": 0},
+                )
+                h_cat_data = _extract_tool_payload(h_cat)
+                assert isinstance(h_cat_data, dict)
+                assert "items" in h_cat_data
+                print("      HTTP list_vehicles matches stdio discovery outcome!")
 
                 # Test clean lookup parity
                 h_res = await http_session.call_tool(
