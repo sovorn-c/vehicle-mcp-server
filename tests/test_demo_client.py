@@ -32,6 +32,20 @@ def test_demo_client_asserts_multi_revision_history() -> None:
     assert "52300" in demo_source, "demo.py must assert phase-2 updated odometer (52300)"
 
 
+def test_demo_client_begins_with_catalog_discovery() -> None:
+    demo_source = Path("src/vehicle_mcp_server/demo.py").read_text()
+
+    # Demo must verify 6 tools
+    assert "len(stdio_tool_names) == 6" in demo_source, "demo.py must assert 6 tools in catalog"
+
+    # Demo must invoke list_vehicles as first discovery step
+    assert '"list_vehicles"' in demo_source, "demo.py must call list_vehicles"
+
+    # Dynamic selection of conflict vehicle and temporal vehicle
+    assert "has_conflicts" in demo_source, "demo.py must select conflict vehicle via has_conflicts"
+    assert "revision_number" in demo_source, "demo.py must select temporal vehicle via revision_number"
+
+
 @pytest.mark.asyncio
 async def test_demo_client_module_callable() -> None:
     # Verify module entrypoint exists and is callable
