@@ -65,6 +65,8 @@ def test_stdio_server_starts_and_lists_tools() -> None:
         assert list_resp["id"] == 2
         tool_names = [t["name"] for t in list_resp["result"]["tools"]]
         assert "lookup_vehicle" in tool_names
+        assert "list_vehicles" in tool_names
+        assert len(tool_names) == 6
 
     finally:
         if proc.poll() is None:
