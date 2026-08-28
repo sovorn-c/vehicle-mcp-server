@@ -1,0 +1,41 @@
+"""Acceptance contract test asserting public documentation completeness and accuracy."""
+
+from pathlib import Path
+
+
+def test_documentation_contract() -> None:
+    readme_path = Path("README.md")
+    assert readme_path.exists(), "README.md must exist"
+    readme = readme_path.read_text()
+
+    # Required 5 tools documented
+    assert "lookup_vehicle" in readme
+    assert "explain_vehicle_field" in readme
+    assert "get_vehicle_history" in readme
+    assert "get_vehicle_revision" in readme
+    assert "get_source_observation" in readme
+
+    # Transports and client integration documented
+    assert "stdio" in readme
+    assert "Streamable HTTP" in readme or "streamable-http" in readme
+    assert "Claude Desktop" in readme or "claude_desktop_config.json" in readme
+
+    # Architecture and upstream relationship documented
+    assert "nz-vehicle-data-pipeline" in readme or "Pipeline" in readme
+    assert "127.0.0.1" in readme or "localhost" in readme
+    assert "scripts/smoke-local.sh" in readme
+    assert "scripts/check.sh" in readme
+
+    # Security & limitations documented
+    assert "DNS rebinding" in readme or "rebinding" in readme or "loopback" in readme
+    assert "synthetic" in readme.lower() or "limitation" in readme.lower()
+
+    # Never describe repository as a recruiting artifact or hiring portfolio
+    forbidden_meta = [
+        "recruiting artifact",
+        "hiring manager",
+        "portfolio project for recruiters",
+        "built to impress recruiters",
+    ]
+    for phrase in forbidden_meta:
+        assert phrase not in readme.lower(), f"Forbidden recruiting trope found in README: {phrase}"
