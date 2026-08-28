@@ -262,6 +262,7 @@ async def test_explain_vehicle_field_never_leaks_raw_payload(
             "explain_vehicle_field",
             {"vin": "1HGCR2F85HA000000", "field_name": "make"},
         )
+
         # Recursively assert no 'raw_payload' in any dict/list
         def assert_no_raw_payload(data: object) -> None:
             if isinstance(data, dict):

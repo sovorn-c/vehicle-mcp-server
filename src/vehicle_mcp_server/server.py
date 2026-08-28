@@ -9,8 +9,8 @@ from mcp.server.mcpserver import Context, MCPServer
 
 from vehicle_mcp_server.client import VehiclePipelineClient
 from vehicle_mcp_server.config import ServerConfig
-from vehicle_mcp_server.models import VehicleRevisionResponse
-from vehicle_mcp_server.tools import execute_lookup_vehicle
+from vehicle_mcp_server.models import FieldExplanationResult, VehicleRevisionResponse
+from vehicle_mcp_server.tools import execute_explain_vehicle_field, execute_lookup_vehicle
 
 
 def create_server(
@@ -49,5 +49,23 @@ def create_server(
             "pipeline_client"
         ]
         return await execute_lookup_vehicle(pipeline_client, vin)
+
+    @server.tool(
+        name="explain_vehicle_field",
+        description=(
+            "Explain one vehicle field outcome (RESOLVED, UNRESOLVED, or ABSENT) "
+            "using current evidence."
+        ),
+        structured_output=True,
+    )
+    async def explain_vehicle_field(
+        vin: str,
+        field_name: str,
+        ctx: Context,
+    ) -> FieldExplanationResult:
+        pipeline_client: VehiclePipelineClient = ctx.request_context.lifespan_context[
+            "pipeline_client"
+        ]
+        return await execute_explain_vehicle_field(pipeline_client, vin, field_name)
 
     return server
