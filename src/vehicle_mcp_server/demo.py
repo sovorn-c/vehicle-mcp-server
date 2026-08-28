@@ -164,28 +164,51 @@ async def run_demonstration(
         )
         hist_data = _extract_tool_payload(hist_res)
         assert isinstance(hist_data, list)
-        assert len(hist_data) >= 1
         rev_numbers = [r["revision_number"] for r in hist_data]
-        print(f"      History returned {len(hist_data)} revisions (latest: rev {rev_numbers[0]})")
+        assert rev_numbers == [2, 1], f"Expected revisions [2, 1], got {rev_numbers}"
+        print(f"      History returned revisions: {rev_numbers}")
 
-        rev_res = await stdio_client.call_tool(
+        # Check latest revision (Rev 2)
+        rev2 = hist_data[0]
+        assert rev2["revision_number"] == 2
+        assert rev2["canonical_fields"]["asking_price_cents"] == 1995000
+        assert rev2["canonical_fields"]["odometer_km"] == 52300
+
+        # Check earlier revision (Rev 1)
+        rev1 = hist_data[1]
+        assert rev1["revision_number"] == 1
+        assert rev1["canonical_fields"]["asking_price_cents"] == 2150000
+
+        # Point-in-time exact revision 1 retrieval
+        rev1_res = await stdio_client.call_tool(
             "get_vehicle_revision",
             arguments={"vin": "1HGCR2F85HA000000", "revision_number": 1},
         )
-        rev_data = _extract_tool_payload(rev_res)
-        assert rev_data["revision_number"] == 1
-        print(f"      Fetched exact revision 1 successfully (as_of: {rev_data['as_of']})")
+        rev1_data = _extract_tool_payload(rev1_res)
+        assert rev1_data["revision_number"] == 1
+        assert rev1_data["canonical_fields"]["asking_price_cents"] == 2150000
+        p1 = rev1_data["canonical_fields"]["asking_price_cents"]
+        print(f"      Fetched exact revision 1 (price: {p1})")
 
-        # Pick observation_id from field_provenance
+        # Point-in-time exact revision 2 retrieval
+        rev2_res = await stdio_client.call_tool(
+            "get_vehicle_revision",
+            arguments={"vin": "1HGCR2F85HA000000", "revision_number": 2},
+        )
+        rev2_data = _extract_tool_payload(rev2_res)
+        assert rev2_data["revision_number"] == 2
+        assert rev2_data["canonical_fields"]["asking_price_cents"] == 1995000
+        assert rev2_data["canonical_fields"]["odometer_km"] == 52300
+        p2 = rev2_data["canonical_fields"]["asking_price_cents"]
+        odo2 = rev2_data["canonical_fields"]["odometer_km"]
+        print(f"      Fetched exact revision 2 (price: {p2}, odo: {odo2})")
+
+        # Pick observation_id from Revision 2 asking_price_cents provenance
         obs_id = None
-        for prov_list in rev_data.get("field_provenance", {}).values():
-            for prov in prov_list:
-                if prov.get("observation_id"):
-                    obs_id = prov["observation_id"]
-                    break
-            if obs_id:
-                break
-        assert obs_id is not None, "Provenance must contain source observation IDs!"
+        prov2_list = rev2_data.get("field_provenance", {}).get("asking_price_cents", [])
+        if prov2_list and prov2_list[0].get("observation_id"):
+            obs_id = prov2_list[0]["observation_id"]
+        assert obs_id is not None, "Revision 2 provenance must name the update observation ID!"
 
         print(f"\n[7/7] Scenario 6: Exact Source Observation ({obs_id})")
         obs_res = await stdio_client.call_tool(

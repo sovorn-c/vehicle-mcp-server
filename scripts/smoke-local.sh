@@ -48,10 +48,11 @@ if [[ "${PIPELINE_READY}" != "true" ]]; then
     exit 1
 fi
 
-echo "==> Seeding pipeline with deterministic vehicle scenarios..."
+echo "==> Seeding pipeline with deterministic vehicle scenarios (Phase 1 & Phase 2)..."
 (
     cd "${PIPELINE_DIR}"
     docker compose --profile tools run --rm seed
+    docker compose --profile tools run --rm seed python -m nz_vehicle_data_pipeline.cli.seed --manifest fixtures/manifest.json --phase2
 )
 
 echo "==> Starting vehicle-mcp-server over Streamable HTTP..."
