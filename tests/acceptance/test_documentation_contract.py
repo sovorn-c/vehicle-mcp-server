@@ -8,12 +8,17 @@ def test_documentation_contract() -> None:
     assert readme_path.exists(), "README.md must exist"
     readme = readme_path.read_text()
 
-    # Required 5 tools documented
+    # Required 6 tools documented
+    assert "list_vehicles" in readme, "README.md must document list_vehicles"
     assert "lookup_vehicle" in readme
     assert "explain_vehicle_field" in readme
     assert "get_vehicle_history" in readme
     assert "get_vehicle_revision" in readme
     assert "get_source_observation" in readme
+
+    # Discovery-to-audit workflow and pagination documented
+    assert "pagination" in readme.lower() or "limit" in readme.lower()
+    assert "discovery" in readme.lower()
 
     # Transports and client integration documented
     assert "stdio" in readme
