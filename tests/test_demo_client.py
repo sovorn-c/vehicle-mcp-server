@@ -1,6 +1,5 @@
-"""Tests for the end-to-end demonstration client and smoke script contracts."""
-
 from pathlib import Path
+
 import pytest
 
 from vehicle_mcp_server.demo import run_demonstration
@@ -24,5 +23,5 @@ def test_smoke_script_exists_and_is_executable() -> None:
 
 @pytest.mark.asyncio
 async def test_demo_client_module_callable() -> None:
-    # When executed with a fake pipeline client or live URL, run_demonstration executes without error
+    # Verify module entrypoint exists and is callable
     assert callable(run_demonstration)
