@@ -49,7 +49,7 @@ async def test_transport_tool_list_parity() -> None:
         ht_tool = http_tools[tool_name]
 
         assert st_tool.description == ht_tool.description
-        assert st_tool.inputSchema == ht_tool.inputSchema
+        assert st_tool.input_schema == ht_tool.input_schema
 
 
 @pytest.mark.asyncio
@@ -63,7 +63,7 @@ async def test_transport_call_validation_error_parity() -> None:
             "lookup_vehicle",
             arguments={"vin": "BAD_VIN"},
         )
-        assert stdio_res.isError
+        assert stdio_res.is_error
         assert any(
             "INVALID_INPUT" in content.text
             for content in stdio_res.content
@@ -89,7 +89,7 @@ async def test_transport_call_validation_error_parity() -> None:
             "lookup_vehicle",
             arguments={"vin": "BAD_VIN"},
         )
-        assert http_res.isError
+        assert http_res.is_error
         assert any(
             "INVALID_INPUT" in content.text
             for content in http_res.content

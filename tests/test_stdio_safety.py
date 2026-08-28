@@ -82,17 +82,13 @@ def test_stdio_no_plain_text_on_stdout() -> None:
 
     try:
         assert proc.stdin is not None
-        assert proc.stdout is not None
-        # Send bad JSON to stdin
-        proc.stdin.write("NOT_VALID_JSON\n")
-        proc.stdin.flush()
-
-        line = proc.stdout.readline()
-        if line:
-            # If server responds on stdout, it must still be valid JSON-RPC
-            parsed = json.loads(line)
-            assert parsed.get("jsonrpc") == "2.0"
+        # Send bad JSON and read output with timeout
+        out, _ = proc.communicate(input="NOT_VALID_JSON\n", timeout=2)
+        if out.strip():
+            for line in out.strip().splitlines():
+                parsed = json.loads(line)
+                assert parsed.get("jsonrpc") == "2.0"
     finally:
         if proc.poll() is None:
             proc.terminate()
-            proc.wait(timeout=5)
+            proc.wait(timeout=2)

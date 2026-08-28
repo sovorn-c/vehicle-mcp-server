@@ -3,11 +3,13 @@
 import sys
 
 from vehicle_mcp_server.config import ServerConfig
+from vehicle_mcp_server.logging import setup_logging
 from vehicle_mcp_server.server import create_server
 
 
 def main() -> None:
     """Main CLI entrypoint running stdio or Streamable HTTP transport."""
+    setup_logging()
     config = ServerConfig.from_env()
     server = create_server(config)
 
