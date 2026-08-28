@@ -1,17 +1,13 @@
 """Tests for upstream pipeline response models."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from pydantic import ValidationError
 
 from vehicle_mcp_server.models import (
-    CandidateValue,
-    ConfidenceAssessment,
     ConfidenceBand,
     ConflictState,
-    FieldConflict,
-    ProvenanceLink,
     VehicleRevisionResponse,
 )
 
@@ -72,7 +68,7 @@ def test_vehicle_revision_response_valid(valid_revision_data: dict[str, object])
     assert resp.confidence.score == 75
     assert resp.confidence.band == ConfidenceBand.MEDIUM
     assert resp.synthetic_notice == "Demonstration dataset disclaimer"
-    assert resp.as_of == datetime(2026, 8, 20, 10, 0, tzinfo=timezone.utc)
+    assert resp.as_of == datetime(2026, 8, 20, 10, 0, tzinfo=UTC)
 
 
 def test_vehicle_revision_response_rejects_extra_fields(

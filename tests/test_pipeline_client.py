@@ -63,7 +63,7 @@ async def test_get_current_vehicle_success(clean_vehicle_json: str) -> None:
 
 @pytest.mark.asyncio
 async def test_get_current_vehicle_not_found() -> None:
-    def handler(request: httpx2.Request) -> httpx2.Response:
+    def handler(_request: httpx2.Request) -> httpx2.Response:
         return httpx2.Response(404, json={"detail": "Vehicle not found"})
 
     transport = httpx2.MockTransport(handler)
@@ -78,7 +78,7 @@ async def test_get_current_vehicle_not_found() -> None:
 
 @pytest.mark.asyncio
 async def test_get_current_vehicle_invalid_input_422() -> None:
-    def handler(request: httpx2.Request) -> httpx2.Response:
+    def handler(_request: httpx2.Request) -> httpx2.Response:
         return httpx2.Response(422, json={"detail": "Invalid VIN structure"})
 
     transport = httpx2.MockTransport(handler)
@@ -93,7 +93,7 @@ async def test_get_current_vehicle_invalid_input_422() -> None:
 
 @pytest.mark.asyncio
 async def test_get_current_vehicle_contract_error_on_drift() -> None:
-    def handler(request: httpx2.Request) -> httpx2.Response:
+    def handler(_request: httpx2.Request) -> httpx2.Response:
         # Extra field rejected under strict contract
         return httpx2.Response(200, json={"vin": "1HGCR2F85HA000000", "unexpected": True})
 
@@ -109,7 +109,7 @@ async def test_get_current_vehicle_contract_error_on_drift() -> None:
 
 @pytest.mark.asyncio
 async def test_get_current_vehicle_contract_error_on_non_json() -> None:
-    def handler(request: httpx2.Request) -> httpx2.Response:
+    def handler(_request: httpx2.Request) -> httpx2.Response:
         return httpx2.Response(200, text="<html>502 Bad Gateway</html>")
 
     transport = httpx2.MockTransport(handler)
@@ -124,7 +124,7 @@ async def test_get_current_vehicle_contract_error_on_non_json() -> None:
 
 @pytest.mark.asyncio
 async def test_get_current_vehicle_timeout() -> None:
-    def handler(request: httpx2.Request) -> httpx2.Response:
+    def handler(_request: httpx2.Request) -> httpx2.Response:
         raise httpx2.ReadTimeout("Read timed out")
 
     transport = httpx2.MockTransport(handler)
@@ -139,7 +139,7 @@ async def test_get_current_vehicle_timeout() -> None:
 
 @pytest.mark.asyncio
 async def test_get_current_vehicle_unavailable() -> None:
-    def handler(request: httpx2.Request) -> httpx2.Response:
+    def handler(_request: httpx2.Request) -> httpx2.Response:
         return httpx2.Response(503, json={"detail": "Service unavailable"})
 
     transport = httpx2.MockTransport(handler)
