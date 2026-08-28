@@ -32,6 +32,52 @@ class LookupVehicleInput(BaseModel):
         return cleaned
 
 
+FIELD_NAME_PATTERN = re.compile(r"^[a-z0-9_]{1,64}$")
+
+
+class ExplainVehicleFieldInput(BaseModel):
+    """Input parameters for explaining one canonical vehicle field."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    vin: str = Field(
+        description="17-character Vehicle Identification Number (excluding letters I, O, Q)"
+    )
+    field_name: str = Field(description="Normalized lowercase snake_case vehicle field name")
+
+    @field_validator("vin", mode="before")
+    @classmethod
+    def normalize_vin(cls, v: object) -> str:
+        if not isinstance(v, str):
+            raise ValueError("VIN must be a string")
+        cleaned = v.strip().upper()
+        if not VIN_PATTERN.match(cleaned):
+            raise ValueError(
+                "VIN must be exactly 17 ASCII alphanumeric characters excluding letters I, O, and Q"
+            )
+        return cleaned
+
+    @field_validator("field_name", mode="before")
+    @classmethod
+    def normalize_field_name(cls, v: object) -> str:
+        if not isinstance(v, str):
+            raise ValueError("field_name must be a string")
+        cleaned = v.strip().lower()
+        if not FIELD_NAME_PATTERN.match(cleaned):
+            raise ValueError(
+                "field_name must be 1 to 64 lowercase alphanumeric or underscore characters"
+            )
+        return cleaned
+
+
+class FieldOutcome(StrEnum):
+    """Deterministic field explanation outcome."""
+
+    RESOLVED = "RESOLVED"
+    UNRESOLVED = "UNRESOLVED"
+    ABSENT = "ABSENT"
+
+
 class ConfidenceBand(StrEnum):
     """Calibrated tier of confidence rating."""
 
@@ -125,6 +171,47 @@ class VehicleRevisionResponse(BaseModel):
     confidence: ConfidenceAssessment = Field(description="Confidence assessment")
     as_of: datetime = Field(description="Evaluation timestamp")
     published_at: datetime = Field(description="Database publication timestamp")
+    synthetic_notice: str | None = Field(
+        default=None,
+        description="Disclaimer notice when record contains synthetic demonstration data",
+    )
+
+
+class FieldExplanationResult(BaseModel):
+    """Deterministic projection of one vehicle field's current evidence state."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    vin: str = Field(description="Canonical 17-character VIN")
+    revision_number: int = Field(description="Canonical revision number evaluated")
+    field_name: str = Field(description="Evaluated field name")
+    outcome: FieldOutcome = Field(description="RESOLVED, UNRESOLVED, or ABSENT outcome")
+    value: Any | None = Field(default=None, description="Resolved canonical value if present")
+    provenance: list[ProvenanceLink] = Field(
+        default_factory=list, description="Lineage to supporting source observations"
+    )
+    conflicts: list[FieldConflict] = Field(
+        default_factory=list, description="Recorded field conflicts if any"
+    )
+    confidence_score: int | None = Field(
+        default=None, description="Overall revision confidence score"
+    )
+    confidence_band: ConfidenceBand | None = Field(
+        default=None, description="Overall revision confidence band"
+    )
+    field_confidence_score: int | None = Field(
+        default=None, description="Per-field confidence score if evaluated"
+    )
+    field_components: dict[str, int] | None = Field(
+        default=None, description="Per-field confidence score component breakdown"
+    )
+    available_fields: list[str] = Field(
+        default_factory=list,
+        description="Sorted available canonical and conflicting field names",
+    )
+    rationale: str | None = Field(
+        default=None, description="Human-readable explanation of outcome or conflict rationale"
+    )
     synthetic_notice: str | None = Field(
         default=None,
         description="Disclaimer notice when record contains synthetic demonstration data",

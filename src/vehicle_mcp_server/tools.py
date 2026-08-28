@@ -14,7 +14,10 @@ from vehicle_mcp_server.client import (
     VehiclePipelineClient,
 )
 from vehicle_mcp_server.models import (
+    FieldExplanationResult,
+    FieldOutcome,
     LookupVehicleInput,
+    ProvenanceLink,
     SafeError,
     SafeErrorCategory,
     VehicleRevisionResponse,
@@ -106,3 +109,86 @@ async def execute_lookup_vehicle(
                 remediation="Inspect server stderr diagnostics for operational details.",
             ).model_dump_json()
         ) from exc
+
+
+def project_field_explanation(
+    vehicle: VehicleRevisionResponse,
+    field_name: str,
+) -> FieldExplanationResult:
+    """Project one canonical field's current evidence state deterministically."""
+    canonical_keys = set(vehicle.canonical_fields.keys())
+    conflict_keys = {c.field_name for c in vehicle.conflicts}
+    available_fields = sorted(canonical_keys | conflict_keys)
+
+    # 1. RESOLVED precedence: key presence in canonical_fields
+    if field_name in vehicle.canonical_fields:
+        return FieldExplanationResult(
+            vin=vehicle.vin,
+            revision_number=vehicle.revision_number,
+            field_name=field_name,
+            outcome=FieldOutcome.RESOLVED,
+            value=vehicle.canonical_fields[field_name],
+            provenance=vehicle.field_provenance.get(field_name, []),
+            conflicts=[c for c in vehicle.conflicts if c.field_name == field_name],
+            confidence_score=vehicle.confidence.score,
+            confidence_band=vehicle.confidence.band,
+            field_confidence_score=vehicle.confidence.field_scores.get(field_name),
+            field_components=vehicle.confidence.field_components.get(field_name),
+            available_fields=available_fields,
+            rationale=(
+                f"Field '{field_name}' is resolved in canonical revision {vehicle.revision_number}."
+            ),
+            synthetic_notice=vehicle.synthetic_notice,
+        )
+
+    # 2. UNRESOLVED precedence: matching field conflicts and no canonical key
+    matching_conflicts = [c for c in vehicle.conflicts if c.field_name == field_name]
+    if matching_conflicts:
+        conflict_prov: list[ProvenanceLink] = []
+        for c in matching_conflicts:
+            for cand in c.conflicting_candidates:
+                conflict_prov.append(cand.provenance)
+
+        first_conflict = matching_conflicts[0]
+        rationale = (
+            first_conflict.rationale
+            or f"Field '{field_name}' has unresolved disagreements between source candidates."
+        )
+
+        return FieldExplanationResult(
+            vin=vehicle.vin,
+            revision_number=vehicle.revision_number,
+            field_name=field_name,
+            outcome=FieldOutcome.UNRESOLVED,
+            value=None,
+            provenance=conflict_prov,
+            conflicts=matching_conflicts,
+            confidence_score=vehicle.confidence.score,
+            confidence_band=vehicle.confidence.band,
+            field_confidence_score=vehicle.confidence.field_scores.get(field_name, 0),
+            field_components=vehicle.confidence.field_components.get(field_name),
+            available_fields=available_fields,
+            rationale=rationale,
+            synthetic_notice=vehicle.synthetic_notice,
+        )
+
+    # 3. ABSENT: neither canonical key nor conflict
+    return FieldExplanationResult(
+        vin=vehicle.vin,
+        revision_number=vehicle.revision_number,
+        field_name=field_name,
+        outcome=FieldOutcome.ABSENT,
+        value=None,
+        provenance=[],
+        conflicts=[],
+        confidence_score=vehicle.confidence.score,
+        confidence_band=vehicle.confidence.band,
+        field_confidence_score=None,
+        field_components=None,
+        available_fields=available_fields,
+        rationale=(
+            f"Field '{field_name}' has neither a canonical value nor recorded conflicts "
+            f"in revision {vehicle.revision_number}."
+        ),
+        synthetic_notice=vehicle.synthetic_notice,
+    )

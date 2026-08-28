@@ -1,6 +1,6 @@
 """Tests for pure deterministic field explanation projection."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -23,7 +23,7 @@ def sample_vehicle() -> VehicleRevisionResponse:
         observation_id="obs-01",
         source_system="NZTA",
         source_record_id="rec-01",
-        retrieved_at=datetime(2026, 8, 20, 10, 0, tzinfo=timezone.utc),
+        retrieved_at=datetime(2026, 8, 20, 10, 0, tzinfo=UTC),
         synthetic=True,
     )
     conflict = FieldConflict(
@@ -66,8 +66,8 @@ def sample_vehicle() -> VehicleRevisionResponse:
             rule_version="confidence-v1",
             explanation="Medium confidence",
         ),
-        as_of=datetime(2026, 8, 20, 10, 0, tzinfo=timezone.utc),
-        published_at=datetime(2026, 8, 20, 10, 5, tzinfo=timezone.utc),
+        as_of=datetime(2026, 8, 20, 10, 0, tzinfo=UTC),
+        published_at=datetime(2026, 8, 20, 10, 5, tzinfo=UTC),
         synthetic_notice="Demonstration data notice",
     )
 
