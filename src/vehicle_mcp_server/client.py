@@ -17,6 +17,14 @@ class VehicleNotFoundError(PipelineError):
     """Raised when the requested vehicle does not exist in the pipeline (HTTP 404)."""
 
 
+class RevisionNotFoundError(PipelineError):
+    """Raised when the requested vehicle revision does not exist in the pipeline (HTTP 404)."""
+
+
+class ObservationNotFoundError(PipelineError):
+    """Raised when the requested source observation does not exist in the pipeline (HTTP 404)."""
+
+
 class PipelineInvalidInputError(PipelineError):
     """Raised when the pipeline rejects input as unprocessable (HTTP 422)."""
 
@@ -83,6 +91,133 @@ class VehiclePipelineClient:
 
         if response.status_code == 422:
             raise PipelineInvalidInputError(f"Pipeline rejected VIN '{vin}' as invalid input.")
+
+        if response.status_code in (502, 503, 504):
+            raise PipelineUnavailableError(
+                f"Pipeline returned service unavailable: {response.status_code}"
+            )
+
+        raise PipelineContractError(
+            f"Unexpected pipeline HTTP status {response.status_code} from {url}"
+        )
+
+    async def get_vehicle_history(
+        self,
+        vin: str,
+        limit: int = 20,
+        before_revision: int | None = None,
+    ) -> list[VehicleRevisionResponse]:
+        """Retrieve historical revisions for a vehicle in newest-first order."""
+        encoded_vin = quote(vin, safe="")
+        url = f"{self._base_url}/v1/vehicles/{encoded_vin}/history"
+        params: dict[str, str] = {"limit": str(limit)}
+        if before_revision is not None:
+            params["before_revision"] = str(before_revision)
+
+        try:
+            response = await self._http_client.get(
+                url,
+                params=params,
+                timeout=httpx2.Timeout(
+                    connect=self._config.connect_timeout,
+                    read=self._config.read_timeout,
+                    write=self._config.write_timeout,
+                    pool=self._config.pool_timeout,
+                ),
+            )
+        except httpx2.TimeoutException as exc:
+            raise PipelineTimeoutError(f"Request to pipeline timed out: {url}") from exc
+        except (httpx2.NetworkError, httpx2.RemoteProtocolError) as exc:
+            raise PipelineUnavailableError(
+                f"Failed to connect to pipeline service at {url}"
+            ) from exc
+
+        if response.status_code == 200:
+            try:
+                data = response.json()
+            except Exception as exc:
+                raise PipelineContractError(
+                    f"Pipeline response is not valid JSON from {url}"
+                ) from exc
+
+            if not isinstance(data, list):
+                raise PipelineContractError(f"Expected list from {url}, got {type(data)}")
+
+            if len(data) == 0 and before_revision is None:
+                raise VehicleNotFoundError(f"Vehicle with VIN '{vin}' not found.")
+
+            try:
+                return [VehicleRevisionResponse.model_validate(item) for item in data]
+            except ValidationError as exc:
+                raise PipelineContractError(
+                    f"Pipeline history item violates VehicleRevisionResponse contract: {exc}"
+                ) from exc
+
+        if response.status_code == 404:
+            raise VehicleNotFoundError(f"Vehicle with VIN '{vin}' not found.")
+
+        if response.status_code == 422:
+            raise PipelineInvalidInputError(f"Pipeline rejected history query for VIN '{vin}'.")
+
+        if response.status_code in (502, 503, 504):
+            raise PipelineUnavailableError(
+                f"Pipeline returned service unavailable: {response.status_code}"
+            )
+
+        raise PipelineContractError(
+            f"Unexpected pipeline HTTP status {response.status_code} from {url}"
+        )
+
+    async def get_vehicle_revision(
+        self,
+        vin: str,
+        revision_number: int,
+    ) -> VehicleRevisionResponse:
+        """Retrieve one exact immutable canonical revision by number."""
+        encoded_vin = quote(vin, safe="")
+        url = f"{self._base_url}/v1/vehicles/{encoded_vin}/revisions/{revision_number}"
+
+        try:
+            response = await self._http_client.get(
+                url,
+                timeout=httpx2.Timeout(
+                    connect=self._config.connect_timeout,
+                    read=self._config.read_timeout,
+                    write=self._config.write_timeout,
+                    pool=self._config.pool_timeout,
+                ),
+            )
+        except httpx2.TimeoutException as exc:
+            raise PipelineTimeoutError(f"Request to pipeline timed out: {url}") from exc
+        except (httpx2.NetworkError, httpx2.RemoteProtocolError) as exc:
+            raise PipelineUnavailableError(
+                f"Failed to connect to pipeline service at {url}"
+            ) from exc
+
+        if response.status_code == 200:
+            try:
+                data = response.json()
+            except Exception as exc:
+                raise PipelineContractError(
+                    f"Pipeline response is not valid JSON from {url}"
+                ) from exc
+
+            try:
+                return VehicleRevisionResponse.model_validate(data)
+            except ValidationError as exc:
+                raise PipelineContractError(
+                    f"Pipeline revision violates VehicleRevisionResponse contract: {exc}"
+                ) from exc
+
+        if response.status_code == 404:
+            raise RevisionNotFoundError(
+                f"Revision {revision_number} for vehicle with VIN '{vin}' not found."
+            )
+
+        if response.status_code == 422:
+            raise PipelineInvalidInputError(
+                f"Pipeline rejected revision request for VIN '{vin}' revision {revision_number}."
+            )
 
         if response.status_code in (502, 503, 504):
             raise PipelineUnavailableError(

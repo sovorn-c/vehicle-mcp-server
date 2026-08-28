@@ -70,6 +70,65 @@ class ExplainVehicleFieldInput(BaseModel):
         return cleaned
 
 
+class GetVehicleHistoryInput(BaseModel):
+    """Input parameters for retrieving vehicle revision history."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    vin: str = Field(
+        description="17-character Vehicle Identification Number (excluding letters I, O, Q)"
+    )
+    limit: int = Field(
+        default=20,
+        ge=1,
+        le=100,
+        description="Number of revisions to return (1 through 100)",
+    )
+    before_revision: int | None = Field(
+        default=None,
+        ge=1,
+        description="Optional cursor to retrieve revisions before this revision number",
+    )
+
+    @field_validator("vin", mode="before")
+    @classmethod
+    def normalize_vin(cls, v: object) -> str:
+        if not isinstance(v, str):
+            raise ValueError("VIN must be a string")
+        cleaned = v.strip().upper()
+        if not VIN_PATTERN.match(cleaned):
+            raise ValueError(
+                "VIN must be exactly 17 ASCII alphanumeric characters excluding letters I, O, and Q"
+            )
+        return cleaned
+
+
+class GetVehicleRevisionInput(BaseModel):
+    """Input parameters for retrieving one exact immutable canonical revision."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    vin: str = Field(
+        description="17-character Vehicle Identification Number (excluding letters I, O, Q)"
+    )
+    revision_number: int = Field(
+        ge=1,
+        description="Positive integer revision number to retrieve",
+    )
+
+    @field_validator("vin", mode="before")
+    @classmethod
+    def normalize_vin(cls, v: object) -> str:
+        if not isinstance(v, str):
+            raise ValueError("VIN must be a string")
+        cleaned = v.strip().upper()
+        if not VIN_PATTERN.match(cleaned):
+            raise ValueError(
+                "VIN must be exactly 17 ASCII alphanumeric characters excluding letters I, O, and Q"
+            )
+        return cleaned
+
+
 class FieldOutcome(StrEnum):
     """Deterministic field explanation outcome."""
 

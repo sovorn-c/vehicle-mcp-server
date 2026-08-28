@@ -10,7 +10,12 @@ from mcp.server.mcpserver import Context, MCPServer
 from vehicle_mcp_server.client import VehiclePipelineClient
 from vehicle_mcp_server.config import ServerConfig
 from vehicle_mcp_server.models import FieldExplanationResult, VehicleRevisionResponse
-from vehicle_mcp_server.tools import execute_explain_vehicle_field, execute_lookup_vehicle
+from vehicle_mcp_server.tools import (
+    execute_explain_vehicle_field,
+    execute_get_vehicle_history,
+    execute_get_vehicle_revision,
+    execute_lookup_vehicle,
+)
 
 
 def create_server(
@@ -67,5 +72,49 @@ def create_server(
             "pipeline_client"
         ]
         return await execute_explain_vehicle_field(pipeline_client, vin, field_name)
+
+    @server.tool(
+        name="get_vehicle_history",
+        description=(
+            "Retrieve historical canonical revisions for a vehicle in newest-first order."
+        ),
+        structured_output=True,
+    )
+    async def get_vehicle_history(
+        vin: str,
+        ctx: Context,
+        limit: int = 20,
+        before_revision: int | None = None,
+    ) -> list[VehicleRevisionResponse]:
+        pipeline_client: VehiclePipelineClient = ctx.request_context.lifespan_context[
+            "pipeline_client"
+        ]
+        return await execute_get_vehicle_history(
+            pipeline_client,
+            vin=vin,
+            limit=limit,
+            before_revision=before_revision,
+        )
+
+    @server.tool(
+        name="get_vehicle_revision",
+        description=(
+            "Retrieve one exact immutable canonical revision for a vehicle by revision number."
+        ),
+        structured_output=True,
+    )
+    async def get_vehicle_revision(
+        vin: str,
+        revision_number: int,
+        ctx: Context,
+    ) -> VehicleRevisionResponse:
+        pipeline_client: VehiclePipelineClient = ctx.request_context.lifespan_context[
+            "pipeline_client"
+        ]
+        return await execute_get_vehicle_revision(
+            pipeline_client,
+            vin=vin,
+            revision_number=revision_number,
+        )
 
     return server

@@ -10,6 +10,7 @@ from vehicle_mcp_server.client import (
     PipelineInvalidInputError,
     PipelineTimeoutError,
     PipelineUnavailableError,
+    RevisionNotFoundError,
     VehicleNotFoundError,
     VehiclePipelineClient,
 )
@@ -17,6 +18,8 @@ from vehicle_mcp_server.models import (
     ExplainVehicleFieldInput,
     FieldExplanationResult,
     FieldOutcome,
+    GetVehicleHistoryInput,
+    GetVehicleRevisionInput,
     LookupVehicleInput,
     ProvenanceLink,
     SafeError,
@@ -196,6 +199,190 @@ async def execute_explain_vehicle_field(
         ) from exc
 
     return project_field_explanation(vehicle, validated.field_name)
+
+
+async def execute_get_vehicle_history(
+    client: VehiclePipelineClient,
+    vin: str,
+    limit: int = 20,
+    before_revision: int | None = None,
+) -> list[VehicleRevisionResponse]:
+    """Execute bounded vehicle revision history query."""
+    try:
+        validated = GetVehicleHistoryInput(
+            vin=vin,
+            limit=limit,
+            before_revision=before_revision,
+        )
+    except ValidationError as exc:
+        raise ToolError(
+            SafeError(
+                category=SafeErrorCategory.INVALID_INPUT,
+                message=f"Invalid history query parameters: {exc}",
+                retryable=False,
+                remediation="Ensure limit is between 1 and 100, and before_revision is >= 1.",
+            ).model_dump_json()
+        ) from exc
+
+    try:
+        return await client.get_vehicle_history(
+            validated.vin,
+            limit=validated.limit,
+            before_revision=validated.before_revision,
+        )
+    except VehicleNotFoundError as exc:
+        raise ToolError(
+            SafeError(
+                category=SafeErrorCategory.VEHICLE_NOT_FOUND,
+                message=str(exc),
+                retryable=False,
+                remediation="Check that the VIN is registered and published in the pipeline.",
+            ).model_dump_json()
+        ) from exc
+    except PipelineInvalidInputError as exc:
+        raise ToolError(
+            SafeError(
+                category=SafeErrorCategory.INVALID_INPUT,
+                message=str(exc),
+                retryable=False,
+                remediation=(
+                    "Check the VIN or query parameter values against pipeline requirements."
+                ),
+            ).model_dump_json()
+        ) from exc
+    except PipelineContractError as exc:
+        raise ToolError(
+            SafeError(
+                category=SafeErrorCategory.PIPELINE_CONTRACT_ERROR,
+                message="Upstream pipeline history response violated the accepted schema contract.",
+                retryable=False,
+                remediation=(
+                    "Verify that the pipeline service version is compatible with this server."
+                ),
+            ).model_dump_json()
+        ) from exc
+    except PipelineTimeoutError as exc:
+        raise ToolError(
+            SafeError(
+                category=SafeErrorCategory.PIPELINE_TIMEOUT,
+                message="The pipeline request timed out.",
+                retryable=True,
+                remediation="Retry the history query after a short delay.",
+            ).model_dump_json()
+        ) from exc
+    except PipelineUnavailableError as exc:
+        raise ToolError(
+            SafeError(
+                category=SafeErrorCategory.PIPELINE_UNAVAILABLE,
+                message="The upstream pipeline service is unreachable or returned a gateway error.",
+                retryable=True,
+                remediation="Check if the pipeline service is running and accessible.",
+            ).model_dump_json()
+        ) from exc
+    except Exception as exc:
+        print(f"[INTERNAL_ERROR] get_vehicle_history error: {exc}", file=sys.stderr)
+        raise ToolError(
+            SafeError(
+                category=SafeErrorCategory.INTERNAL_ERROR,
+                message="An unexpected internal error occurred while retrieving history.",
+                retryable=False,
+                remediation="Inspect server stderr diagnostics for operational details.",
+            ).model_dump_json()
+        ) from exc
+
+
+async def execute_get_vehicle_revision(
+    client: VehiclePipelineClient,
+    vin: str,
+    revision_number: int,
+) -> VehicleRevisionResponse:
+    """Execute exact vehicle canonical revision retrieval."""
+    try:
+        validated = GetVehicleRevisionInput(vin=vin, revision_number=revision_number)
+    except ValidationError as exc:
+        raise ToolError(
+            SafeError(
+                category=SafeErrorCategory.INVALID_INPUT,
+                message=f"Invalid revision retrieval input: {exc}",
+                retryable=False,
+                remediation=(
+                    "Provide a valid 17-character VIN and a positive revision number (>= 1)."
+                ),
+            ).model_dump_json()
+        ) from exc
+
+    try:
+        return await client.get_vehicle_revision(validated.vin, validated.revision_number)
+    except RevisionNotFoundError as exc:
+        raise ToolError(
+            SafeError(
+                category=SafeErrorCategory.REVISION_NOT_FOUND,
+                message=str(exc),
+                retryable=False,
+                remediation=(
+                    "Check revision history to find valid revision numbers for this vehicle."
+                ),
+            ).model_dump_json()
+        ) from exc
+    except VehicleNotFoundError as exc:
+        raise ToolError(
+            SafeError(
+                category=SafeErrorCategory.VEHICLE_NOT_FOUND,
+                message=str(exc),
+                retryable=False,
+                remediation="Check that the VIN is registered in the upstream pipeline.",
+            ).model_dump_json()
+        ) from exc
+    except PipelineInvalidInputError as exc:
+        raise ToolError(
+            SafeError(
+                category=SafeErrorCategory.INVALID_INPUT,
+                message=str(exc),
+                retryable=False,
+                remediation="Verify the VIN and revision number format against pipeline rules.",
+            ).model_dump_json()
+        ) from exc
+    except PipelineContractError as exc:
+        raise ToolError(
+            SafeError(
+                category=SafeErrorCategory.PIPELINE_CONTRACT_ERROR,
+                message=(
+                    "Upstream pipeline revision response violated the accepted schema contract."
+                ),
+                retryable=False,
+                remediation=(
+                    "Verify that the pipeline service version is compatible with this server."
+                ),
+            ).model_dump_json()
+        ) from exc
+    except PipelineTimeoutError as exc:
+        raise ToolError(
+            SafeError(
+                category=SafeErrorCategory.PIPELINE_TIMEOUT,
+                message="The pipeline request timed out.",
+                retryable=True,
+                remediation="Retry the revision retrieval after a short delay.",
+            ).model_dump_json()
+        ) from exc
+    except PipelineUnavailableError as exc:
+        raise ToolError(
+            SafeError(
+                category=SafeErrorCategory.PIPELINE_UNAVAILABLE,
+                message="The upstream pipeline service is unreachable or returned a gateway error.",
+                retryable=True,
+                remediation="Check if the pipeline service is running and accessible.",
+            ).model_dump_json()
+        ) from exc
+    except Exception as exc:
+        print(f"[INTERNAL_ERROR] get_vehicle_revision error: {exc}", file=sys.stderr)
+        raise ToolError(
+            SafeError(
+                category=SafeErrorCategory.INTERNAL_ERROR,
+                message="An unexpected internal error occurred while retrieving revision.",
+                retryable=False,
+                remediation="Inspect server stderr diagnostics for operational details.",
+            ).model_dump_json()
+        ) from exc
 
 
 def project_field_explanation(
