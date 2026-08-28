@@ -1,6 +1,7 @@
 """Tests for packaging, Dockerfile standards, and container configuration."""
 
 from pathlib import Path
+
 import pytest
 
 from vehicle_mcp_server.config import ServerConfig

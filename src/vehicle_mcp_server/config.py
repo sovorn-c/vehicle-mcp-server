@@ -4,7 +4,7 @@ import os
 from typing import Any, Literal
 from urllib.parse import urlsplit
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class ServerConfig(BaseModel):
@@ -70,6 +70,10 @@ class ServerConfig(BaseModel):
         le=10_485_760,
         description="Maximum allowed response body size in bytes from the pipeline",
     )
+    allow_insecure_bind: bool = Field(
+        default=False,
+        description="Allow binding to non-loopback host (e.g. inside a container)",
+    )
 
     @field_validator("pipeline_base_url")
     @classmethod
@@ -83,20 +87,27 @@ class ServerConfig(BaseModel):
             raise ValueError("pipeline_base_url must include a host")
         return v.rstrip("/")
 
-    @field_validator("http_host")
-    @classmethod
-    def validate_http_host(cls, v: str) -> str:
-        if v in ("127.0.0.1", "localhost", "::1"):
-            return v
-        import ipaddress
+    @model_validator(mode="after")
+    def validate_http_host_security(self) -> "ServerConfig":
+        if (
+            self.transport == "http"
+            and not self.allow_insecure_bind
+            and self.http_host not in ("127.0.0.1", "localhost", "::1")
+        ):
+            import ipaddress
 
-        try:
-            ip = ipaddress.ip_address(v)
-            if ip.is_loopback:
-                return v
-        except ValueError:
-            pass
-        raise ValueError("http_host must be a loopback address (e.g. 127.0.0.1, localhost, ::1)")
+            is_loopback = False
+            try:
+                ip = ipaddress.ip_address(self.http_host)
+                is_loopback = ip.is_loopback
+            except ValueError:
+                pass
+            if not is_loopback:
+                raise ValueError(
+                    f"Insecure public bind '{self.http_host}' rejected without override: "
+                    "http_host must be a loopback address (e.g. 127.0.0.1, localhost, ::1)"
+                )
+        return self
 
     @classmethod
     def from_env(cls) -> "ServerConfig":
@@ -118,6 +129,14 @@ class ServerConfig(BaseModel):
         port = os.getenv("VEHICLE_MCP_HTTP_PORT")
         if port:
             kwargs["http_port"] = int(port)
+
+        allow_insecure_bind = os.getenv("VEHICLE_MCP_ALLOW_INSECURE_BIND")
+        if allow_insecure_bind:
+            kwargs["allow_insecure_bind"] = allow_insecure_bind.lower() in (
+                "true",
+                "1",
+                "yes",
+            )
 
         connect_timeout = os.getenv("VEHICLE_MCP_CONNECT_TIMEOUT")
         if connect_timeout:
