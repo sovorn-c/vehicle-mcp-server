@@ -9,7 +9,6 @@ import pytest
 from vehicle_mcp_server.client import (
     PipelineContractError,
     PipelineInvalidInputError,
-    PipelineTimeoutError,
     PipelineUnavailableError,
     VehiclePipelineClient,
 )
@@ -86,7 +85,7 @@ async def test_list_vehicles_empty_page_is_successful() -> None:
         "disclaimer": None,
     }
 
-    def handler(request: httpx2.Request) -> httpx2.Response:
+    def handler(_request: httpx2.Request) -> httpx2.Response:
         return httpx2.Response(200, json=empty_page)
 
     transport = httpx2.MockTransport(handler)
@@ -111,10 +110,12 @@ async def test_list_vehicles_empty_page_is_successful() -> None:
 async def test_list_vehicles_pre_network_validation_fails_closed(limit: int, offset: int) -> None:
     calls = 0
 
-    def handler(request: httpx2.Request) -> httpx2.Response:
+    def handler(_request: httpx2.Request) -> httpx2.Response:
         nonlocal calls
         calls += 1
-        return httpx2.Response(200, json={"items": [], "total": 0, "limit": limit, "offset": offset})
+        return httpx2.Response(
+            200, json={"items": [], "total": 0, "limit": limit, "offset": offset}
+        )
 
     transport = httpx2.MockTransport(handler)
     async with httpx2.AsyncClient(transport=transport) as http_client:
@@ -127,7 +128,7 @@ async def test_list_vehicles_pre_network_validation_fails_closed(limit: int, off
 
 @pytest.mark.asyncio
 async def test_list_vehicles_422_maps_to_invalid_input() -> None:
-    def handler(request: httpx2.Request) -> httpx2.Response:
+    def handler(_request: httpx2.Request) -> httpx2.Response:
         return httpx2.Response(422, json={"detail": "Invalid offset parameter"})
 
     transport = httpx2.MockTransport(handler)
@@ -139,7 +140,7 @@ async def test_list_vehicles_422_maps_to_invalid_input() -> None:
 
 @pytest.mark.asyncio
 async def test_list_vehicles_malformed_json() -> None:
-    def handler(request: httpx2.Request) -> httpx2.Response:
+    def handler(_request: httpx2.Request) -> httpx2.Response:
         return httpx2.Response(200, content=b"invalid json {{{")
 
     transport = httpx2.MockTransport(handler)
@@ -157,7 +158,7 @@ async def test_list_vehicles_contract_violation_extra_or_missing_fields() -> Non
         "unexpected_extra_key": True,
     }
 
-    def handler(request: httpx2.Request) -> httpx2.Response:
+    def handler(_request: httpx2.Request) -> httpx2.Response:
         return httpx2.Response(200, json=invalid_page)
 
     transport = httpx2.MockTransport(handler)
@@ -178,7 +179,7 @@ async def test_list_vehicles_oversized_response() -> None:
     }
     content = json.dumps(oversized_data).encode("utf-8")
 
-    def handler(request: httpx2.Request) -> httpx2.Response:
+    def handler(_request: httpx2.Request) -> httpx2.Response:
         return httpx2.Response(200, content=content)
 
     config = _make_config(max_response_bytes=10240)
@@ -191,7 +192,7 @@ async def test_list_vehicles_oversized_response() -> None:
 
 @pytest.mark.asyncio
 async def test_list_vehicles_unavailable_after_retries() -> None:
-    def handler(request: httpx2.Request) -> httpx2.Response:
+    def handler(_request: httpx2.Request) -> httpx2.Response:
         return httpx2.Response(503, content=b"Service Unavailable")
 
     transport = httpx2.MockTransport(handler)

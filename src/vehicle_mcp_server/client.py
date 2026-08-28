@@ -7,7 +7,11 @@ import httpx2
 from pydantic import ValidationError
 
 from vehicle_mcp_server.config import ServerConfig
-from vehicle_mcp_server.models import SourceObservationResponse, VehicleRevisionResponse
+from vehicle_mcp_server.models import (
+    SourceObservationResponse,
+    VehicleCatalogPage,
+    VehicleRevisionResponse,
+)
 
 
 class PipelineError(Exception):
@@ -133,6 +137,47 @@ class VehiclePipelineClient:
         if last_error:
             raise last_error
         raise PipelineUnavailableError("Max request attempts exhausted.")
+
+    async def list_vehicles(
+        self,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> VehicleCatalogPage:
+        """Retrieve a bounded page of canonical vehicle summaries from the catalog."""
+        if not (1 <= limit <= 100):
+            raise PipelineInvalidInputError(f"limit must be between 1 and 100, got {limit}")
+        if offset < 0:
+            raise PipelineInvalidInputError(f"offset must be non-negative, got {offset}")
+
+        url = f"{self._base_url}/v1/vehicles"
+        params: dict[str, str] = {"limit": str(limit), "offset": str(offset)}
+
+        response = await self._request_with_retry("GET", url, params=params)
+
+        if response.status_code == 200:
+            self._check_response_size(response, url)
+            try:
+                data = response.json()
+            except Exception as exc:
+                raise PipelineContractError(
+                    f"Pipeline response is not valid JSON from {url}"
+                ) from exc
+
+            try:
+                return VehicleCatalogPage.model_validate(data)
+            except ValidationError as exc:
+                raise PipelineContractError(
+                    f"Pipeline catalog page violates VehicleCatalogPage contract: {exc}"
+                ) from exc
+
+        if response.status_code == 422:
+            raise PipelineInvalidInputError(
+                f"Pipeline rejected catalog request with limit={limit}, offset={offset}."
+            )
+
+        raise PipelineContractError(
+            f"Unexpected pipeline HTTP status {response.status_code} from {url}"
+        )
 
     async def get_current_vehicle(self, vin: str) -> VehicleRevisionResponse:
         """Retrieve the canonical record and audit metadata for one validated VIN."""
