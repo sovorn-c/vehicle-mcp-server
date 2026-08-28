@@ -129,6 +129,30 @@ class GetVehicleRevisionInput(BaseModel):
         return cleaned
 
 
+OBSERVATION_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_\-\:]{1,128}$")
+
+
+class GetSourceObservationInput(BaseModel):
+    """Input parameters for retrieving one exact source observation."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    observation_id: str = Field(description="Bounded identifier of the source observation")
+
+    @field_validator("observation_id", mode="before")
+    @classmethod
+    def validate_observation_id(cls, v: object) -> str:
+        if not isinstance(v, str):
+            raise ValueError("observation_id must be a string")
+        cleaned = v.strip()
+        if not OBSERVATION_ID_PATTERN.match(cleaned):
+            raise ValueError(
+                "observation_id must be 1 to 128 alphanumeric, underscore, "
+                "hyphen, or colon characters"
+            )
+        return cleaned
+
+
 class FieldOutcome(StrEnum):
     """Deterministic field explanation outcome."""
 
@@ -274,6 +298,23 @@ class FieldExplanationResult(BaseModel):
     synthetic_notice: str | None = Field(
         default=None,
         description="Disclaimer notice when record contains synthetic demonstration data",
+    )
+
+
+class SourceObservationResponse(BaseModel):
+    """Exact immutable source observation containing raw source evidence."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    observation_id: str = Field(description="Unique observation identifier")
+    source_system: str = Field(description="Source system name")
+    source_record_id: str = Field(description="Source-native record identifier")
+    ingestion_run_id: str = Field(description="Ingestion run identifier")
+    raw_payload: str = Field(description="Exact raw payload string captured from source")
+    payload_hash_sha256: str = Field(description="SHA-256 fingerprint of the raw payload")
+    retrieved_at: datetime = Field(description="Timestamp when source evidence was retrieved")
+    synthetic: bool = Field(
+        description="Flag indicating if observation contains demonstration data"
     )
 
 

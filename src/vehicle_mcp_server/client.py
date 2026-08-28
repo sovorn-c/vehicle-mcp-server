@@ -1,12 +1,13 @@
 """Typed asynchronous client for accessing the NZ Vehicle Data Pipeline API."""
 
+import hashlib
 from urllib.parse import quote
 
 import httpx2
 from pydantic import ValidationError
 
 from vehicle_mcp_server.config import ServerConfig
-from vehicle_mcp_server.models import VehicleRevisionResponse
+from vehicle_mcp_server.models import SourceObservationResponse, VehicleRevisionResponse
 
 
 class PipelineError(Exception):
@@ -217,6 +218,74 @@ class VehiclePipelineClient:
         if response.status_code == 422:
             raise PipelineInvalidInputError(
                 f"Pipeline rejected revision request for VIN '{vin}' revision {revision_number}."
+            )
+
+        if response.status_code in (502, 503, 504):
+            raise PipelineUnavailableError(
+                f"Pipeline returned service unavailable: {response.status_code}"
+            )
+
+        raise PipelineContractError(
+            f"Unexpected pipeline HTTP status {response.status_code} from {url}"
+        )
+
+    async def get_source_observation(
+        self,
+        observation_id: str,
+    ) -> SourceObservationResponse:
+        """Retrieve one exact immutable source observation by ID."""
+        encoded_id = quote(observation_id, safe="")
+        url = f"{self._base_url}/v1/observations/{encoded_id}"
+
+        try:
+            response = await self._http_client.get(
+                url,
+                timeout=httpx2.Timeout(
+                    connect=self._config.connect_timeout,
+                    read=self._config.read_timeout,
+                    write=self._config.write_timeout,
+                    pool=self._config.pool_timeout,
+                ),
+            )
+        except httpx2.TimeoutException as exc:
+            raise PipelineTimeoutError(f"Request to pipeline timed out: {url}") from exc
+        except (httpx2.NetworkError, httpx2.RemoteProtocolError) as exc:
+            raise PipelineUnavailableError(
+                f"Failed to connect to pipeline service at {url}"
+            ) from exc
+
+        if response.status_code == 200:
+            try:
+                data = response.json()
+            except Exception as exc:
+                raise PipelineContractError(
+                    f"Pipeline response is not valid JSON from {url}"
+                ) from exc
+
+            try:
+                obs = SourceObservationResponse.model_validate(data)
+            except ValidationError as exc:
+                raise PipelineContractError(
+                    f"Pipeline observation violates SourceObservationResponse contract: {exc}"
+                ) from exc
+
+            # Verify SHA-256 integrity
+            computed_hash = hashlib.sha256(obs.raw_payload.encode("utf-8")).hexdigest()
+            expected_hash = obs.payload_hash_sha256.lower().removeprefix("sha256:")
+            if computed_hash != expected_hash:
+                raise PipelineContractError(
+                    f"Payload SHA-256 mismatch for observation '{observation_id}': "
+                    f"computed {computed_hash} != {expected_hash}"
+                )
+
+            return obs
+
+        if response.status_code == 404:
+            raise ObservationNotFoundError(f"Observation '{observation_id}' not found.")
+
+        if response.status_code == 422:
+            raise PipelineInvalidInputError(
+                f"Pipeline rejected observation request for ID '{observation_id}'."
             )
 
         if response.status_code in (502, 503, 504):

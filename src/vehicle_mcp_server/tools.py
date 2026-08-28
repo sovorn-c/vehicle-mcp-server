@@ -6,6 +6,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import ValidationError
 
 from vehicle_mcp_server.client import (
+    ObservationNotFoundError,
     PipelineContractError,
     PipelineInvalidInputError,
     PipelineTimeoutError,
@@ -18,12 +19,14 @@ from vehicle_mcp_server.models import (
     ExplainVehicleFieldInput,
     FieldExplanationResult,
     FieldOutcome,
+    GetSourceObservationInput,
     GetVehicleHistoryInput,
     GetVehicleRevisionInput,
     LookupVehicleInput,
     ProvenanceLink,
     SafeError,
     SafeErrorCategory,
+    SourceObservationResponse,
     VehicleRevisionResponse,
 )
 
@@ -379,6 +382,82 @@ async def execute_get_vehicle_revision(
             SafeError(
                 category=SafeErrorCategory.INTERNAL_ERROR,
                 message="An unexpected internal error occurred while retrieving revision.",
+                retryable=False,
+                remediation="Inspect server stderr diagnostics for operational details.",
+            ).model_dump_json()
+        ) from exc
+
+
+async def execute_get_source_observation(
+    client: VehiclePipelineClient,
+    observation_id: str,
+) -> SourceObservationResponse:
+    """Execute exact source observation retrieval with hash integrity validation."""
+    try:
+        validated = GetSourceObservationInput(observation_id=observation_id)
+    except ValidationError as exc:
+        raise ToolError(
+            SafeError(
+                category=SafeErrorCategory.INVALID_INPUT,
+                message=f"Invalid observation input: {exc}",
+                retryable=False,
+                remediation="Provide a valid observation identifier (1-128 chars).",
+            ).model_dump_json()
+        ) from exc
+
+    try:
+        return await client.get_source_observation(validated.observation_id)
+    except ObservationNotFoundError as exc:
+        raise ToolError(
+            SafeError(
+                category=SafeErrorCategory.OBSERVATION_NOT_FOUND,
+                message=str(exc),
+                retryable=False,
+                remediation="Check the observation ID from field provenance links.",
+            ).model_dump_json()
+        ) from exc
+    except PipelineInvalidInputError as exc:
+        raise ToolError(
+            SafeError(
+                category=SafeErrorCategory.INVALID_INPUT,
+                message=str(exc),
+                retryable=False,
+                remediation="Check the observation ID format against pipeline requirements.",
+            ).model_dump_json()
+        ) from exc
+    except PipelineContractError as exc:
+        raise ToolError(
+            SafeError(
+                category=SafeErrorCategory.PIPELINE_CONTRACT_ERROR,
+                message=f"Upstream pipeline observation contract or hash violated: {exc}",
+                retryable=False,
+                remediation="Verify that the pipeline observation store is intact.",
+            ).model_dump_json()
+        ) from exc
+    except PipelineTimeoutError as exc:
+        raise ToolError(
+            SafeError(
+                category=SafeErrorCategory.PIPELINE_TIMEOUT,
+                message="The pipeline request timed out.",
+                retryable=True,
+                remediation="Retry the observation retrieval after a short delay.",
+            ).model_dump_json()
+        ) from exc
+    except PipelineUnavailableError as exc:
+        raise ToolError(
+            SafeError(
+                category=SafeErrorCategory.PIPELINE_UNAVAILABLE,
+                message="The upstream pipeline service is unreachable or returned a gateway error.",
+                retryable=True,
+                remediation="Check if the pipeline service is running and accessible.",
+            ).model_dump_json()
+        ) from exc
+    except Exception as exc:
+        print(f"[INTERNAL_ERROR] get_source_observation error: {exc}", file=sys.stderr)
+        raise ToolError(
+            SafeError(
+                category=SafeErrorCategory.INTERNAL_ERROR,
+                message="An unexpected internal error occurred while retrieving observation.",
                 retryable=False,
                 remediation="Inspect server stderr diagnostics for operational details.",
             ).model_dump_json()

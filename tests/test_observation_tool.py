@@ -1,7 +1,6 @@
 """Tests for get_source_observation MCP tool."""
 
 import hashlib
-from datetime import UTC, datetime
 
 import httpx2
 import pytest

@@ -9,9 +9,14 @@ from mcp.server.mcpserver import Context, MCPServer
 
 from vehicle_mcp_server.client import VehiclePipelineClient
 from vehicle_mcp_server.config import ServerConfig
-from vehicle_mcp_server.models import FieldExplanationResult, VehicleRevisionResponse
+from vehicle_mcp_server.models import (
+    FieldExplanationResult,
+    SourceObservationResponse,
+    VehicleRevisionResponse,
+)
 from vehicle_mcp_server.tools import (
     execute_explain_vehicle_field,
+    execute_get_source_observation,
     execute_get_vehicle_history,
     execute_get_vehicle_revision,
     execute_lookup_vehicle,
@@ -115,6 +120,25 @@ def create_server(
             pipeline_client,
             vin=vin,
             revision_number=revision_number,
+        )
+
+    @server.tool(
+        name="get_source_observation",
+        description=(
+            "Retrieve one exact immutable source observation by ID, including verified raw payload."
+        ),
+        structured_output=True,
+    )
+    async def get_source_observation(
+        observation_id: str,
+        ctx: Context,
+    ) -> SourceObservationResponse:
+        pipeline_client: VehiclePipelineClient = ctx.request_context.lifespan_context[
+            "pipeline_client"
+        ]
+        return await execute_get_source_observation(
+            pipeline_client,
+            observation_id=observation_id,
         )
 
     return server
