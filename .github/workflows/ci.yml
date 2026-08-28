@@ -43,3 +43,34 @@ jobs:
 
       - name: Build Docker container
         run: docker build -t vehicle-mcp-server:ci .
+
+  cross-repo-smoke:
+    runs-on: ubuntu-latest
+    needs: [ci]
+
+    steps:
+      - name: Check out MCP server
+        uses: actions/checkout@v4
+        with:
+          path: vehicle-mcp-server
+
+      - name: Check out verified upstream pipeline
+        uses: actions/checkout@v4
+        with:
+          repository: sovorn/nz-vehicle-data-pipeline
+          ref: 21024499ec71bc09b33b136de9ca369ca052685b
+          path: nz-vehicle-data-pipeline
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          version: "0.5.26"
+
+      - name: Set up Python 3.12
+        run: uv python install 3.12
+
+      - name: Run cross-repository smoke
+        run: |
+          cd vehicle-mcp-server
+          PIPELINE_DIR="${GITHUB_WORKSPACE}/nz-vehicle-data-pipeline" bash scripts/smoke-local.sh

@@ -5,17 +5,26 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 PIPELINE_DIR="${PIPELINE_DIR:-${ROOT_DIR}/../nz-vehicle-data-pipeline}"
+PIPELINE_REF="${PIPELINE_REF:-21024499ec71bc09b33b136de9ca369ca052685b}"
 
 echo "=================================================================="
 echo " Starting End-to-End Local Smoke Verification"
 echo "=================================================================="
 echo "MCP Server Root: ${ROOT_DIR}"
 echo "Pipeline Dir:    ${PIPELINE_DIR}"
+echo "Pipeline Ref:    ${PIPELINE_REF}"
 
 if [[ ! -d "${PIPELINE_DIR}" ]]; then
     echo "ERROR: Pipeline directory not found at ${PIPELINE_DIR}"
     echo "Please set PIPELINE_DIR to the checkout of nz-vehicle-data-pipeline."
     exit 1
+fi
+
+if [[ -d "${PIPELINE_DIR}/.git" && -n "${PIPELINE_REF}" ]]; then
+    ACTUAL_REF=$(git -C "${PIPELINE_DIR}" rev-parse HEAD 2>/dev/null || true)
+    if [[ -n "${ACTUAL_REF}" && "${ACTUAL_REF}" != "${PIPELINE_REF}"* ]]; then
+        echo "NOTICE: Pipeline repository ref is ${ACTUAL_REF}, verified baseline ref is ${PIPELINE_REF}"
+    fi
 fi
 
 cleanup() {
