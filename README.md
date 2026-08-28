@@ -23,7 +23,7 @@ All pipeline interactions occur over an authenticated, defensive HTTP client bou
 │                       Vehicle Intelligence MCP Server                   │
 │                                                                         │
 │  - Input Validation & Normalization (17-char VIN, snake_case fields)    │
-│  - Tool Surface (lookup, explain, history, revision, observation)       │
+│  - Tool Surface (list, lookup, explain, history, revision, obs)         │
 │  - Uncertainty & Conflict Preservation (UNKNOWN != ABSENT)             │
 │  - Redaction & Isolation (raw payloads confined to observation tool)    │
 │  - Single-line JSON Diagnostics exclusively to stderr                   │
@@ -42,9 +42,24 @@ All pipeline interactions occur over an authenticated, defensive HTTP client bou
 
 ## Tool Surface
 
-The server exposes five purpose-built MCP tools:
+The server exposes six purpose-built MCP tools:
 
-### 1. `lookup_vehicle`
+### 1. `list_vehicles`
+Discovers canonical vehicles in the catalog via bounded pagination without loading full records or raw source evidence.
+- **Inputs**:
+  - `limit` (integer, optional, default: 20, range: 1–100): Bounded page size.
+  - `offset` (integer, optional, default: 0, minimum: 0): Zero-based pagination offset.
+- **Outputs**:
+  - `items`: Bounded list of `VehicleSummary` records (`vin`, `make`, `model`, `year`, `registration_status`, `confidence_score`, `has_conflicts`, `revision_number`, `synthetic`).
+  - `total`: Total count of canonical vehicles matching catalog criteria.
+  - `limit`: Applied page limit.
+  - `offset`: Applied page offset.
+  - `disclaimer`: Synthetic notice or usage disclaimer when applicable.
+- **Semantics**:
+  - Empty page semantics: requesting an offset beyond available records returns `items: []` with the valid `total` count rather than an error.
+  - Catalog isolation: discovery summaries omit raw source payloads and granular field provenance to protect client token budgets.
+
+### 2. `lookup_vehicle`
 Retrieves the latest canonical record for a 17-character VIN.
 - **Inputs**: `vin` (string, required, normalized 17-character VIN).
 - **Outputs**:
@@ -55,7 +70,7 @@ Retrieves the latest canonical record for a 17-character VIN.
   - `synthetic_notice`: Notice when the record contains synthetic demonstration data.
 - **Safety guarantee**: Never leaks internal raw payloads into canonical lookup results.
 
-### 2. `explain_vehicle_field`
+### 3. `explain_vehicle_field`
 Provides an in-depth audit explanation for a specific canonical field.
 - **Inputs**:
   - `vin` (string, required).
@@ -69,7 +84,7 @@ Provides an in-depth audit explanation for a specific canonical field.
   - `conflicts`: Competing candidates and conflict rationales (if `UNRESOLVED`).
   - `field_confidence_score` & `field_components`: Freshness, authority, agreement, and validation metrics.
 
-### 3. `get_vehicle_history`
+### 4. `get_vehicle_history`
 Returns monotonic vehicle revision history in descending chronological order.
 - **Inputs**:
   - `vin` (string, required).
@@ -77,20 +92,32 @@ Returns monotonic vehicle revision history in descending chronological order.
   - `before_revision` (integer, optional cursor for pagination).
 - **Outputs**: Array of historical revisions with material hash fingerprints.
 
-### 4. `get_vehicle_revision`
+### 5. `get_vehicle_revision`
 Fetches an exact point-in-time canonical revision state.
 - **Inputs**:
   - `vin` (string, required).
   - `revision_number` (integer, required, >= 1).
 - **Outputs**: Full canonical revision snapshot as evaluated at that point in time.
 
-### 5. `get_source_observation`
+### 6. `get_source_observation`
 Retrieves the raw source record that contributed to a canonical decision.
 - **Inputs**: `observation_id` (string, required).
 - **Outputs**:
   - `source_system`: Originating source (e.g. `NZTA_MVR`, `NHTSA_VPIC`, `PPSR_SYNTHETIC`).
   - `retrieved_at`: Observation ingestion timestamp.
   - `raw_payload`: Complete original payload as received from the upstream source.
+
+---
+
+## Discovery-to-Audit Workflow
+
+The server enables MCP clients and AI agents to systematically navigate from discovery to audit:
+
+1. **Discover**: Call `list_vehicles(limit=20, offset=0)` to discover vehicles in the catalog and check flags like `has_conflicts` or `revision_number >= 2`.
+2. **Inspect**: For an identified VIN, call `lookup_vehicle(vin=...)` to retrieve the current canonical state, confidence scores, and conflict flags.
+3. **Audit Conflicts**: If `has_conflicts` is true or a specific attribute is contested, call `explain_vehicle_field(vin=..., field_name=...)` to review competing candidates.
+4. **Trace Temporal Changes**: If `revision_number >= 2`, call `get_vehicle_history(vin=...)` and `get_vehicle_revision(vin=..., revision_number=...)` to inspect immutable point-in-time snapshots.
+5. **Inspect Raw Evidence**: Trace `observation_id` references from field provenance to source payloads via `get_source_observation(observation_id=...)`.
 
 ---
 

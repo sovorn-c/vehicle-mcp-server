@@ -43,7 +43,9 @@ def test_demo_client_begins_with_catalog_discovery() -> None:
 
     # Dynamic selection of conflict vehicle and temporal vehicle
     assert "has_conflicts" in demo_source, "demo.py must select conflict vehicle via has_conflicts"
-    assert "revision_number" in demo_source, "demo.py must select temporal vehicle via revision_number"
+    assert "revision_number" in demo_source, (
+        "demo.py must select temporal vehicle via revision_number"
+    )
 
 
 @pytest.mark.asyncio
