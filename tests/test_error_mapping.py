@@ -1,10 +1,7 @@
 """Tests for standardized safe error mapping taxonomy and exception isolation."""
 
-import json
-
 import pytest
 from mcp.server.mcpserver.exceptions import ToolError
-from pydantic import ValidationError
 
 from vehicle_mcp_server.client import (
     ObservationNotFoundError,
@@ -32,14 +29,46 @@ async def test_safe_tool_boundary_success() -> None:
 @pytest.mark.parametrize(
     ("exception_to_raise", "expected_category", "expected_retryable"),
     [
-        (VehicleNotFoundError("VIN '1HGCR2F85HA000000' not found"), SafeErrorCategory.VEHICLE_NOT_FOUND, False),
-        (RevisionNotFoundError("Revision 99 not found"), SafeErrorCategory.REVISION_NOT_FOUND, False),
-        (ObservationNotFoundError("Observation 'obs-1' not found"), SafeErrorCategory.OBSERVATION_NOT_FOUND, False),
-        (PipelineInvalidInputError("Invalid query syntax"), SafeErrorCategory.INVALID_INPUT, False),
-        (PipelineTimeoutError("Pipeline read timed out"), SafeErrorCategory.PIPELINE_TIMEOUT, True),
-        (PipelineUnavailableError("Service 503 unavailable"), SafeErrorCategory.PIPELINE_UNAVAILABLE, True),
-        (PipelineContractError("Contract drift detected"), SafeErrorCategory.PIPELINE_CONTRACT_ERROR, False),
-        (RuntimeError("Unexpected division by zero"), SafeErrorCategory.INTERNAL_ERROR, False),
+        (
+            VehicleNotFoundError("VIN '1HGCR2F85HA000000' not found"),
+            SafeErrorCategory.VEHICLE_NOT_FOUND,
+            False,
+        ),
+        (
+            RevisionNotFoundError("Revision 99 not found"),
+            SafeErrorCategory.REVISION_NOT_FOUND,
+            False,
+        ),
+        (
+            ObservationNotFoundError("Observation 'obs-1' not found"),
+            SafeErrorCategory.OBSERVATION_NOT_FOUND,
+            False,
+        ),
+        (
+            PipelineInvalidInputError("Invalid query syntax"),
+            SafeErrorCategory.INVALID_INPUT,
+            False,
+        ),
+        (
+            PipelineTimeoutError("Pipeline read timed out"),
+            SafeErrorCategory.PIPELINE_TIMEOUT,
+            True,
+        ),
+        (
+            PipelineUnavailableError("Service 503 unavailable"),
+            SafeErrorCategory.PIPELINE_UNAVAILABLE,
+            True,
+        ),
+        (
+            PipelineContractError("Contract drift detected"),
+            SafeErrorCategory.PIPELINE_CONTRACT_ERROR,
+            False,
+        ),
+        (
+            RuntimeError("Unexpected division by zero"),
+            SafeErrorCategory.INTERNAL_ERROR,
+            False,
+        ),
     ],
 )
 async def test_safe_tool_boundary_all_categories(

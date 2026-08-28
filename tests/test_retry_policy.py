@@ -1,14 +1,11 @@
 """Tests for bounded transient retry policy on idempotent reads."""
 
 import asyncio
-from unittest.mock import AsyncMock
 
 import httpx2
 import pytest
 
 from vehicle_mcp_server.client import (
-    PipelineContractError,
-    PipelineTimeoutError,
     PipelineUnavailableError,
     VehicleNotFoundError,
     VehiclePipelineClient,
@@ -24,7 +21,7 @@ async def test_retry_on_transient_503_then_success() -> None:
     async def mock_sleep(delay: float) -> None:
         sleep_calls.append(delay)
 
-    def handler(request: httpx2.Request) -> httpx2.Response:
+    def handler(_request: httpx2.Request) -> httpx2.Response:
         nonlocal attempts
         attempts += 1
         if attempts == 1:
