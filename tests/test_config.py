@@ -55,3 +55,13 @@ def test_server_config_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     assert config.transport == "http"
     assert config.http_port == 9090
     assert config.connect_timeout == 3.5
+
+
+def test_package_import_writes_no_stdout(capsys: pytest.CaptureFixture[str]) -> None:
+    import importlib
+
+    import vehicle_mcp_server
+
+    importlib.reload(vehicle_mcp_server)
+    captured = capsys.readouterr()
+    assert captured.out == ""
