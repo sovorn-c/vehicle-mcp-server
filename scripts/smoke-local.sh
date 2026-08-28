@@ -7,12 +7,17 @@ ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 PIPELINE_DIR="${PIPELINE_DIR:-${ROOT_DIR}/../nz-vehicle-data-pipeline}"
 PIPELINE_REF="${PIPELINE_REF:-21024499ec71bc09b33b136de9ca369ca052685b}"
 
+PROJECT_NAME_PIPELINE="${COMPOSE_PROJECT_NAME_PIPELINE:-vehicle-pipeline-smoke}"
+PROJECT_NAME_MCP="${COMPOSE_PROJECT_NAME_MCP:-vehicle-mcp-smoke}"
+
 echo "=================================================================="
 echo " Starting End-to-End Local Smoke Verification"
 echo "=================================================================="
-echo "MCP Server Root: ${ROOT_DIR}"
-echo "Pipeline Dir:    ${PIPELINE_DIR}"
-echo "Pipeline Ref:    ${PIPELINE_REF}"
+echo "MCP Server Root:  ${ROOT_DIR}"
+echo "Pipeline Dir:     ${PIPELINE_DIR}"
+echo "Pipeline Ref:     ${PIPELINE_REF}"
+echo "Pipeline Project: ${PROJECT_NAME_PIPELINE}"
+echo "MCP Project:      ${PROJECT_NAME_MCP}"
 
 if [[ ! -d "${PIPELINE_DIR}" ]]; then
     echo "ERROR: Pipeline directory not found at ${PIPELINE_DIR}"
@@ -23,22 +28,23 @@ fi
 if [[ -d "${PIPELINE_DIR}/.git" && -n "${PIPELINE_REF}" ]]; then
     ACTUAL_REF=$(git -C "${PIPELINE_DIR}" rev-parse HEAD 2>/dev/null || true)
     if [[ -n "${ACTUAL_REF}" && "${ACTUAL_REF}" != "${PIPELINE_REF}"* ]]; then
-        echo "NOTICE: Pipeline repository ref is ${ACTUAL_REF}, verified baseline ref is ${PIPELINE_REF}"
+        echo "ERROR: Pipeline repository ref is ${ACTUAL_REF}, expected verified ref ${PIPELINE_REF}"
+        exit 1
     fi
 fi
 
 cleanup() {
-    echo "==> Cleaning up Docker Compose containers..."
-    (cd "${ROOT_DIR}" && docker compose down --remove-orphans >/dev/null 2>&1 || true)
-    (cd "${PIPELINE_DIR}" && docker compose down --remove-orphans >/dev/null 2>&1 || true)
+    echo "==> Cleaning up Docker Compose containers and dedicated volumes..."
+    (cd "${ROOT_DIR}" && docker compose -p "${PROJECT_NAME_MCP}" down -v --remove-orphans >/dev/null 2>&1 || true)
+    (cd "${PIPELINE_DIR}" && docker compose -p "${PROJECT_NAME_PIPELINE}" down -v --remove-orphans >/dev/null 2>&1 || true)
 }
 trap cleanup EXIT INT TERM
 
 echo "==> Starting pipeline service in ${PIPELINE_DIR}..."
 (
     cd "${PIPELINE_DIR}"
-    docker compose down --remove-orphans >/dev/null 2>&1 || true
-    docker compose up -d --build api
+    docker compose -p "${PROJECT_NAME_PIPELINE}" down -v --remove-orphans >/dev/null 2>&1 || true
+    docker compose -p "${PROJECT_NAME_PIPELINE}" up -d --build api
 )
 
 echo "==> Waiting for Pipeline /ready endpoint..."
@@ -53,23 +59,23 @@ done
 
 if [[ "${PIPELINE_READY}" != "true" ]]; then
     echo "ERROR: Pipeline /ready failed to respond within 30 seconds."
-    (cd "${PIPELINE_DIR}" && docker compose logs)
+    (cd "${PIPELINE_DIR}" && docker compose -p "${PROJECT_NAME_PIPELINE}" logs)
     exit 1
 fi
 
 echo "==> Seeding pipeline with deterministic vehicle scenarios (Phase 1 & Phase 2)..."
 (
     cd "${PIPELINE_DIR}"
-    docker compose --profile tools run --rm seed
-    docker compose --profile tools run --rm seed python -m nz_vehicle_data_pipeline.cli.seed --manifest fixtures/manifest.json --phase2
+    docker compose -p "${PROJECT_NAME_PIPELINE}" --profile tools run --rm seed
+    docker compose -p "${PROJECT_NAME_PIPELINE}" --profile tools run --rm seed python -m nz_vehicle_data_pipeline.cli.seed --manifest fixtures/manifest.json --phase2
 )
 
 echo "==> Starting vehicle-mcp-server over Streamable HTTP..."
 (
     cd "${ROOT_DIR}"
-    docker compose down --remove-orphans >/dev/null 2>&1 || true
+    docker compose -p "${PROJECT_NAME_MCP}" down -v --remove-orphans >/dev/null 2>&1 || true
     # Point to host pipeline from container
-    PIPELINE_BASE_URL="http://host.docker.internal:8000" docker compose up -d --build vehicle-mcp-server
+    PIPELINE_BASE_URL="http://host.docker.internal:8000" docker compose -p "${PROJECT_NAME_MCP}" up -d --build vehicle-mcp-server
 )
 
 echo "==> Waiting for MCP HTTP endpoint on loopback 127.0.0.1:8080..."
@@ -85,7 +91,7 @@ done
 
 if [[ "${MCP_READY}" != "true" ]]; then
     echo "ERROR: vehicle-mcp-server failed to bind and answer on http://127.0.0.1:8080/mcp"
-    (cd "${ROOT_DIR}" && docker compose logs)
+    (cd "${ROOT_DIR}" && docker compose -p "${PROJECT_NAME_MCP}" logs)
     exit 1
 fi
 
