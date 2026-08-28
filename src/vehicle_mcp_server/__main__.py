@@ -14,10 +14,33 @@ def main() -> None:
     if config.transport == "stdio":
         server.run(transport="stdio")
     elif config.transport == "http":
+        from mcp.server.transport_security import TransportSecuritySettings
+
+        security_settings = TransportSecuritySettings(
+            enable_dns_rebinding_protection=True,
+            allowed_hosts=[
+                "127.0.0.1",
+                "127.0.0.1:*",
+                "localhost",
+                "localhost:*",
+                "[::1]",
+                "[::1]:*",
+            ],
+            allowed_origins=[
+                "http://127.0.0.1",
+                "http://127.0.0.1:*",
+                "http://localhost",
+                "http://localhost:*",
+                "http://[::1]",
+                "http://[::1]:*",
+            ],
+        )
         server.run(
             transport="streamable-http",
             host=config.http_host,
             port=config.http_port,
+            stateless_http=True,
+            transport_security=security_settings,
         )
     else:
         print(f"[ERROR] Unsupported transport: {config.transport}", file=sys.stderr)

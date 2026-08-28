@@ -83,6 +83,21 @@ class ServerConfig(BaseModel):
             raise ValueError("pipeline_base_url must include a host")
         return v.rstrip("/")
 
+    @field_validator("http_host")
+    @classmethod
+    def validate_http_host(cls, v: str) -> str:
+        if v in ("127.0.0.1", "localhost", "::1"):
+            return v
+        import ipaddress
+
+        try:
+            ip = ipaddress.ip_address(v)
+            if ip.is_loopback:
+                return v
+        except ValueError:
+            pass
+        raise ValueError("http_host must be a loopback address (e.g. 127.0.0.1, localhost, ::1)")
+
     @classmethod
     def from_env(cls) -> "ServerConfig":
         """Load configuration from environment variables with fallback to defaults."""

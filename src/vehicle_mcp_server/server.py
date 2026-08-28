@@ -6,6 +6,8 @@ from typing import Any
 
 import httpx2
 from mcp.server.mcpserver import Context, MCPServer
+from mcp.server.transport_security import TransportSecuritySettings
+from starlette.applications import Starlette
 
 from vehicle_mcp_server.client import VehiclePipelineClient
 from vehicle_mcp_server.config import ServerConfig
@@ -142,3 +144,38 @@ def create_server(
         )
 
     return server
+
+
+def create_streamable_http_app(
+    config: ServerConfig | None = None,
+    transport: httpx2.AsyncBaseTransport | None = None,
+) -> Starlette:
+    """Create a Starlette ASGI application serving the MCP server over Streamable HTTP."""
+    resolved_config = config or ServerConfig.from_env()
+    server = create_server(resolved_config, transport=transport)
+    security_settings = TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=[
+            "127.0.0.1",
+            "127.0.0.1:*",
+            "localhost",
+            "localhost:*",
+            "[::1]",
+            "[::1]:*",
+            "testserver",
+            "testserver:*",
+        ],
+        allowed_origins=[
+            "http://127.0.0.1",
+            "http://127.0.0.1:*",
+            "http://localhost",
+            "http://localhost:*",
+            "http://[::1]",
+            "http://[::1]:*",
+        ],
+    )
+    return server.streamable_http_app(
+        stateless_http=True,
+        transport_security=security_settings,
+        host=resolved_config.http_host,
+    )

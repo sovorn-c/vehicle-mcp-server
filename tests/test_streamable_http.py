@@ -60,4 +60,3 @@ def test_streamable_http_dns_rebinding_protection() -> None:
             content='{"jsonrpc": "2.0", "method": "tools/list", "id": 1}',
         )
         assert resp_ok.status_code == 200
-
