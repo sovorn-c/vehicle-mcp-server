@@ -1,7 +1,5 @@
 """Tests for lookup_vehicle MCP tool behavior and structured output."""
 
-import json
-
 import httpx2
 import pytest
 from mcp.client import Client
@@ -59,10 +57,7 @@ def sample_vehicle_payload() -> dict[str, object]:
 def parse_tool_error(error_text: str) -> SafeError:
     # Error message may be wrapped like "Error executing tool lookup_vehicle: {json}"
     prefix = "Error executing tool lookup_vehicle: "
-    if prefix in error_text:
-        raw_json = error_text.split(prefix, 1)[1]
-    else:
-        raw_json = error_text
+    raw_json = error_text.split(prefix, 1)[1] if prefix in error_text else error_text
     return SafeError.model_validate_json(raw_json)
 
 
@@ -94,10 +89,7 @@ async def test_lookup_vehicle_success(sample_vehicle_payload: dict[str, object])
         assert result.structured_content is not None
         assert result.structured_content["vin"] == "1HGCR2F85HA000000"
         assert result.structured_content["canonical_fields"]["make"] == "HONDA"
-        assert (
-            result.structured_content["synthetic_notice"]
-            == "Demonstration dataset limitation"
-        )
+        assert result.structured_content["synthetic_notice"] == "Demonstration dataset limitation"
 
 
 @pytest.mark.asyncio
