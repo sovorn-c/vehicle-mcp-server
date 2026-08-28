@@ -1,5 +1,4 @@
-"""Domain models and input/output wire boundaries for Vehicle Intelligence MCP."""
-
+import math
 import re
 from datetime import datetime
 from enum import StrEnum
@@ -8,6 +7,24 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 VIN_PATTERN = re.compile(r"^[A-HJ-NPR-Z0-9]{17}$")
+
+
+class ListVehiclesInput(BaseModel):
+    """Input parameters for listing a page of canonical vehicles from the catalog."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
+
+    limit: int = Field(
+        default=20,
+        ge=1,
+        le=100,
+        description="Number of vehicle summaries to return (1 through 100)",
+    )
+    offset: int = Field(
+        default=0,
+        ge=0,
+        description="Zero-based index of the first summary to return",
+    )
 
 
 class LookupVehicleInput(BaseModel):
@@ -316,6 +333,60 @@ class SourceObservationResponse(BaseModel):
     synthetic: bool = Field(
         description="Flag indicating if observation contains demonstration data"
     )
+
+
+class VehicleSummary(BaseModel):
+    """High-level summary of a canonical vehicle for catalog discovery."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    vin: str = Field(description="Canonical 17-character VIN")
+    make: str | None = Field(default=None, description="Reconciled vehicle make")
+    model: str | None = Field(default=None, description="Reconciled vehicle model")
+    year: int | None = Field(default=None, description="Reconciled model year")
+    registration_status: str | None = Field(default=None, description="Current registration status")
+    confidence_score: float | None = Field(
+        default=None, description="Overall confidence score (0.0 through 1.0)"
+    )
+    has_conflicts: bool = Field(
+        default=False, description="True if any unresolved field conflicts exist"
+    )
+    revision_number: int = Field(default=1, description="Latest revision number")
+    synthetic: bool = Field(default=False, description="True if record incorporates synthetic data")
+
+    @field_validator("vin", mode="before")
+    @classmethod
+    def normalize_vin(cls, v: object) -> str:
+        if not isinstance(v, str):
+            raise ValueError("VIN must be a string")
+        cleaned = v.strip().upper()
+        if not VIN_PATTERN.match(cleaned):
+            raise ValueError(
+                "VIN must be exactly 17 ASCII alphanumeric characters excluding letters I, O, and Q"
+            )
+        return cleaned
+
+    @field_validator("confidence_score")
+    @classmethod
+    def validate_confidence_score(cls, v: float | None) -> float | None:
+        if v is not None:
+            if math.isnan(v) or math.isinf(v):
+                raise ValueError("confidence_score must be a finite number")
+            if not (0.0 <= v <= 1.0):
+                raise ValueError("confidence_score must be between 0.0 and 1.0")
+        return v
+
+
+class VehicleCatalogPage(BaseModel):
+    """Paginated collection of canonical vehicle summaries."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    items: list[VehicleSummary] = Field(description="List of vehicle summaries")
+    total: int = Field(ge=0, description="Total canonical vehicles matching query")
+    limit: int = Field(ge=1, le=100, description="Page size limit")
+    offset: int = Field(ge=0, description="Page offset")
+    disclaimer: str | None = Field(default=None, description="Synthetic data limitation notice")
 
 
 class SafeErrorCategory(StrEnum):

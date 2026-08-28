@@ -1,6 +1,5 @@
 """Tests for catalog discovery models: ListVehiclesInput, VehicleSummary, VehicleCatalogPage."""
 
-import math
 import pytest
 from pydantic import ValidationError
 
