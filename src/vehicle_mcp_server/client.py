@@ -50,6 +50,19 @@ class VehiclePipelineClient:
         self._http_client = http_client
         self._base_url = str(config.pipeline_base_url).rstrip("/")
 
+    def _check_response_size(self, response: httpx2.Response, url: str) -> None:
+        content_length = response.headers.get("content-length")
+        if content_length and int(content_length) > self._config.max_response_bytes:
+            raise PipelineContractError(
+                f"Pipeline response size header ({content_length} bytes) exceeds ceiling "
+                f"of {self._config.max_response_bytes} bytes for {url}"
+            )
+        if len(response.content) > self._config.max_response_bytes:
+            raise PipelineContractError(
+                f"Pipeline response body ({len(response.content)} bytes) exceeds ceiling "
+                f"of {self._config.max_response_bytes} bytes for {url}"
+            )
+
     async def get_current_vehicle(self, vin: str) -> VehicleRevisionResponse:
         """Retrieve the canonical record and audit metadata for one validated VIN."""
         encoded_vin = quote(vin, safe="")
@@ -73,6 +86,7 @@ class VehiclePipelineClient:
             ) from exc
 
         if response.status_code == 200:
+            self._check_response_size(response, url)
             try:
                 data = response.json()
             except Exception as exc:
@@ -134,6 +148,7 @@ class VehiclePipelineClient:
             ) from exc
 
         if response.status_code == 200:
+            self._check_response_size(response, url)
             try:
                 data = response.json()
             except Exception as exc:
@@ -196,6 +211,7 @@ class VehiclePipelineClient:
             ) from exc
 
         if response.status_code == 200:
+            self._check_response_size(response, url)
             try:
                 data = response.json()
             except Exception as exc:
@@ -255,6 +271,7 @@ class VehiclePipelineClient:
             ) from exc
 
         if response.status_code == 200:
+            self._check_response_size(response, url)
             try:
                 data = response.json()
             except Exception as exc:

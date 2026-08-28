@@ -1,7 +1,3 @@
-"""Comprehensive tests for audit tools, response ceiling, and contract validation."""
-
-import hashlib
-
 import httpx2
 import pytest
 from mcp.client import Client
@@ -79,7 +75,8 @@ async def test_distinct_not_found_categories_across_audit_tools() -> None:
         # 1. Vehicle not found
         res_veh = await client.call_tool("lookup_vehicle", {"vin": "1HGCR2F85HA000000"})
         assert res_veh.is_error
-        assert parse_tool_error(res_veh.content[0].text).category == SafeErrorCategory.VEHICLE_NOT_FOUND
+        err_veh = parse_tool_error(res_veh.content[0].text)
+        assert err_veh.category == SafeErrorCategory.VEHICLE_NOT_FOUND
 
         # 2. Revision not found
         res_rev = await client.call_tool(

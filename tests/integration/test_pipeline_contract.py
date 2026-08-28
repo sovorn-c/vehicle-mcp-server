@@ -23,7 +23,9 @@ def is_pipeline_reachable(base_url: str) -> bool:
 async def test_pipeline_contract_live_or_fixture() -> None:
     pipeline_url = os.getenv("PIPELINE_BASE_URL", "http://localhost:8000")
     if not is_pipeline_reachable(pipeline_url):
-        pytest.skip(f"Live pipeline service is not reachable at {pipeline_url}; skipping live integration.")
+        pytest.skip(
+            f"Live pipeline service is not reachable at {pipeline_url}; skipping live integration."
+        )
 
     config = ServerConfig(pipeline_base_url=pipeline_url)
     server = create_server(config)

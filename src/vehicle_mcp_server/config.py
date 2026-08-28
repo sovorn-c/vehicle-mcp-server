@@ -64,6 +64,12 @@ class ServerConfig(BaseModel):
         le=5,
         description="Maximum request attempts for transient failures on idempotent reads",
     )
+    max_response_bytes: int = Field(
+        default=1_048_576,
+        ge=10_240,
+        le=10_485_760,
+        description="Maximum allowed response body size in bytes from the pipeline",
+    )
 
     @field_validator("pipeline_base_url")
     @classmethod
@@ -117,5 +123,9 @@ class ServerConfig(BaseModel):
         max_attempts = os.getenv("VEHICLE_MCP_MAX_ATTEMPTS")
         if max_attempts:
             kwargs["max_attempts"] = int(max_attempts)
+
+        max_response_bytes = os.getenv("VEHICLE_MCP_MAX_RESPONSE_BYTES")
+        if max_response_bytes:
+            kwargs["max_response_bytes"] = int(max_response_bytes)
 
         return cls(**kwargs)
