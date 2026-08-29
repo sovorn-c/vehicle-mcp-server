@@ -39,6 +39,10 @@ def test_github_actions_ci_contract() -> None:
     assert "21024499ec71bc09b33b136de9ca369ca052685b" in content, (
         "ci.yml must pin explicit pipeline ref"
     )
+    assert (
+        'PIPELINE_REF="21024499ec71bc09b33b136de9ca369ca052685b"' in content
+        or "PIPELINE_REF=21024499ec71bc09b33b136de9ca369ca052685b" in content
+    ), "ci.yml must explicitly pass PIPELINE_REF to smoke-local.sh"
     assert "contents: read" in content, "ci.yml must enforce least-privilege contents: read"
 
 

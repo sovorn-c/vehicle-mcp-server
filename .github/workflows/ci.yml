@@ -76,4 +76,4 @@ jobs:
       - name: Run cross-repository smoke
         run: |
           cd vehicle-mcp-server
-          PIPELINE_DIR="${GITHUB_WORKSPACE}/nz-vehicle-data-pipeline" bash scripts/smoke-local.sh
+          PIPELINE_DIR="${GITHUB_WORKSPACE}/nz-vehicle-data-pipeline" PIPELINE_REF="21024499ec71bc09b33b136de9ca369ca052685b" bash scripts/smoke-local.sh
