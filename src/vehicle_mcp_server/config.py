@@ -17,7 +17,7 @@ class ServerConfig(BaseModel):
         description="Public server identity name",
     )
     server_version: str = Field(
-        default="0.1.0",
+        default="0.2.0",
         description="Semantic version of the server",
     )
     pipeline_base_url: str = Field(
