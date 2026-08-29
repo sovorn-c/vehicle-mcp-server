@@ -52,3 +52,13 @@ def test_demo_client_begins_with_catalog_discovery() -> None:
 async def test_demo_client_module_callable() -> None:
     # Verify module entrypoint exists and is callable
     assert callable(run_demonstration)
+
+
+def test_demo_client_does_not_suppress_http_parity_failures() -> None:
+    demo_source = Path("src/vehicle_mcp_server/demo.py").read_text()
+    assert "except Exception as e:" not in demo_source, (
+        "demo.py must not swallow Streamable HTTP exceptions with blanket try/except"
+    )
+    assert "[NOTE] Streamable HTTP verification:" not in demo_source, (
+        "demo.py must fail closed on Streamable HTTP verification failure"
+    )

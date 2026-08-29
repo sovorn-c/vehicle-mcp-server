@@ -260,41 +260,40 @@ async def run_demonstration(
 
     # Check Streamable HTTP transport
     print("\n[HTTP Parity] Testing Streamable HTTP endpoint...")
-    async with httpx2.AsyncClient(timeout=10.0) as http_client:
-        try:
-            async with (
-                streamable_http_client(http_url, http_client=http_client) as (
-                    read_stream,
-                    write_stream,
-                ),
-                ClientSession(read_stream, write_stream) as http_session,
-            ):
-                await http_session.initialize()
-                http_tools_res = await http_session.list_tools()
-                http_tool_names = sorted([t.name for t in http_tools_res.tools])
-                assert http_tool_names == stdio_tool_names
-                print(f"      HTTP tools match stdio catalog: {', '.join(http_tool_names)}")
+    async with (
+        httpx2.AsyncClient(timeout=10.0) as http_client,
+        streamable_http_client(http_url, http_client=http_client) as (
+            read_stream,
+            write_stream,
+        ),
+        ClientSession(read_stream, write_stream) as http_session,
+    ):
+        await http_session.initialize()
+        http_tools_res = await http_session.list_tools()
+        http_tool_names = sorted([t.name for t in http_tools_res.tools])
+        assert http_tool_names == stdio_tool_names, (
+            f"HTTP tools mismatch: {http_tool_names} != {stdio_tool_names}"
+        )
+        print(f"      HTTP tools match stdio catalog: {', '.join(http_tool_names)}")
 
-                # Test list_vehicles parity over HTTP
-                h_cat = await http_session.call_tool(
-                    "list_vehicles",
-                    arguments={"limit": 5, "offset": 0},
-                )
-                h_cat_data = _extract_tool_payload(h_cat)
-                assert isinstance(h_cat_data, dict)
-                assert "items" in h_cat_data
-                print("      HTTP list_vehicles matches stdio discovery outcome!")
+        # Test list_vehicles parity over HTTP
+        h_cat = await http_session.call_tool(
+            "list_vehicles",
+            arguments={"limit": 5, "offset": 0},
+        )
+        h_cat_data = _extract_tool_payload(h_cat)
+        assert isinstance(h_cat_data, dict), "HTTP list_vehicles response must be dict"
+        assert "items" in h_cat_data, "HTTP list_vehicles response must contain items"
+        print("      HTTP list_vehicles matches stdio discovery outcome!")
 
-                # Test clean lookup parity
-                h_res = await http_session.call_tool(
-                    "lookup_vehicle",
-                    arguments={"vin": "1HGCR2F85HA000000"},
-                )
-                h_data = _extract_tool_payload(h_res)
-                assert h_data["canonical_fields"]["make"] == "HONDA"
-                print("      HTTP lookup_vehicle matches stdio canonical outcome!")
-        except Exception as e:
-            print(f"      [NOTE] Streamable HTTP verification: {e}")
+        # Test clean lookup parity
+        h_res = await http_session.call_tool(
+            "lookup_vehicle",
+            arguments={"vin": "1HGCR2F85HA000000"},
+        )
+        h_data = _extract_tool_payload(h_res)
+        assert h_data["canonical_fields"]["make"] == "HONDA"
+        print("      HTTP lookup_vehicle matches stdio canonical outcome!")
 
     print("\n==================================================================")
     print(" Demonstration completed successfully! All evidence preserved.")
