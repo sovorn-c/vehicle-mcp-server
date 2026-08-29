@@ -33,7 +33,9 @@ def test_github_actions_ci_contract() -> None:
 
     # Cross-repository smoke requirement
     assert "smoke-local.sh" in content, "ci.yml must run cross-repository smoke"
-    assert "nz-vehicle-data-pipeline" in content, "ci.yml must check out pipeline repo"
+    assert "repository: sovorn-c/nz-vehicle-data-pipeline" in content, (
+        "ci.yml must check out sovorn-c/nz-vehicle-data-pipeline"
+    )
     assert "21024499ec71bc09b33b136de9ca369ca052685b" in content, (
         "ci.yml must pin explicit pipeline ref"
     )
@@ -50,6 +52,12 @@ def test_smoke_script_verifies_pipeline_ref_and_isolated_compose() -> None:
         "smoke-local.sh must declare default verified PIPELINE_REF"
     )
 
+    # Exact 40-character SHA validation (no prefix wildcard)
+    assert "40" in content, "smoke-local.sh must enforce exact 40-character SHA"
+    assert '!= "${PIPELINE_REF}"' in content or '!= "$PIPELINE_REF"' in content, (
+        "smoke-local.sh must compare exact SHA without prefix wildcard"
+    )
+
     # Dedicated compose project and volume teardown isolation
     assert "-p " in content or "PROJECT_NAME" in content, (
         "smoke-local.sh must use dedicated Compose project name"
@@ -57,3 +65,16 @@ def test_smoke_script_verifies_pipeline_ref_and_isolated_compose() -> None:
     assert "down -v" in content or "down --volumes" in content or "-v " in content, (
         "smoke-local.sh must clean dedicated database volumes"
     )
+
+
+def test_smoke_script_fails_closed_on_invalid_ref() -> None:
+    import subprocess
+
+    result = subprocess.run(
+        ["bash", "scripts/smoke-local.sh"],
+        env={**os.environ, "PIPELINE_REF": "2102449"},
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0
+    assert "40-character" in result.stdout or "ERROR" in result.stdout

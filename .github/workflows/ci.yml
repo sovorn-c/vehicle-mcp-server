@@ -60,7 +60,7 @@ jobs:
       - name: Check out verified upstream pipeline
         uses: actions/checkout@v4
         with:
-          repository: sovorn/nz-vehicle-data-pipeline
+          repository: sovorn-c/nz-vehicle-data-pipeline
           ref: 21024499ec71bc09b33b136de9ca369ca052685b
           path: nz-vehicle-data-pipeline
 

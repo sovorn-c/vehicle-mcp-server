@@ -19,18 +19,25 @@ echo "Pipeline Ref:     ${PIPELINE_REF}"
 echo "Pipeline Project: ${PROJECT_NAME_PIPELINE}"
 echo "MCP Project:      ${PROJECT_NAME_MCP}"
 
+if [[ ! "${PIPELINE_REF}" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "ERROR: PIPELINE_REF must be an exact 40-character commit SHA: ${PIPELINE_REF}"
+    exit 1
+fi
+
 if [[ ! -d "${PIPELINE_DIR}" ]]; then
     echo "ERROR: Pipeline directory not found at ${PIPELINE_DIR}"
     echo "Please set PIPELINE_DIR to the checkout of nz-vehicle-data-pipeline."
     exit 1
 fi
 
-if [[ -d "${PIPELINE_DIR}/.git" && -n "${PIPELINE_REF}" ]]; then
-    ACTUAL_REF=$(git -C "${PIPELINE_DIR}" rev-parse HEAD 2>/dev/null || true)
-    if [[ -n "${ACTUAL_REF}" && "${ACTUAL_REF}" != "${PIPELINE_REF}"* ]]; then
-        echo "ERROR: Pipeline repository ref is ${ACTUAL_REF}, expected verified ref ${PIPELINE_REF}"
-        exit 1
-    fi
+if ! ACTUAL_REF=$(git -C "${PIPELINE_DIR}" rev-parse HEAD 2>/dev/null) || [[ -z "${ACTUAL_REF}" ]]; then
+    echo "ERROR: Unable to determine git commit SHA in PIPELINE_DIR: ${PIPELINE_DIR}"
+    exit 1
+fi
+
+if [[ "${ACTUAL_REF}" != "${PIPELINE_REF}" ]]; then
+    echo "ERROR: Pipeline repository ref is ${ACTUAL_REF}, expected verified ref ${PIPELINE_REF}"
+    exit 1
 fi
 
 cleanup() {
