@@ -200,3 +200,34 @@ async def test_list_vehicles_unavailable_after_retries() -> None:
         client = VehiclePipelineClient(_make_config(max_attempts=2), http_client)
         with pytest.raises(PipelineUnavailableError):
             await client.list_vehicles(limit=20, offset=0)
+
+
+@pytest.mark.asyncio
+async def test_list_vehicles_coerced_field_types_raise_contract_error() -> None:
+    coerced_page = {
+        "items": [
+            {
+                "vin": "1HGCR2F85HA000000",
+                "make": "HONDA",
+                "model": "ACCORD",
+                "year": "2017",  # string year from upstream must be rejected
+                "registration_status": "CURRENT",
+                "confidence_score": 0.85,
+                "has_conflicts": False,
+                "revision_number": 2,
+                "synthetic": True,
+            }
+        ],
+        "total": 1,
+        "limit": 20,
+        "offset": 0,
+    }
+
+    def handler(_request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(200, json=coerced_page)
+
+    transport = httpx2.MockTransport(handler)
+    async with httpx2.AsyncClient(transport=transport) as http_client:
+        client = VehiclePipelineClient(_make_config(), http_client)
+        with pytest.raises(PipelineContractError):
+            await client.list_vehicles(limit=20, offset=0)

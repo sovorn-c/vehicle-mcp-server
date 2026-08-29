@@ -74,7 +74,9 @@ def test_vehicle_summary_valid() -> None:
 def test_vehicle_summary_nullable_fields() -> None:
     summary = VehicleSummary(
         vin="1HGCR2F85HA000000",
+        has_conflicts=False,
         revision_number=1,
+        synthetic=False,
     )
     assert summary.make is None
     assert summary.model is None
@@ -92,6 +94,18 @@ def test_vehicle_summary_nullable_fields() -> None:
         {"vin": "1HGCR2F85HA000000", "confidence_score": float("nan")},
         {"vin": "1HGCR2F85HA000000", "confidence_score": float("inf")},
         {"vin": "1HGCR2F85HA000000", "extra": "invalid"},
+        # Strict mode: string year rejected
+        {
+            "vin": "1HGCR2F85HA000000",
+            "year": "2017",
+            "has_conflicts": False,
+            "revision_number": 1,
+            "synthetic": False,
+        },
+        # Missing required summary fields
+        {"vin": "1HGCR2F85HA000000", "revision_number": 1, "synthetic": False},
+        {"vin": "1HGCR2F85HA000000", "has_conflicts": False, "synthetic": False},
+        {"vin": "1HGCR2F85HA000000", "has_conflicts": False, "revision_number": 1},
     ],
 )
 def test_vehicle_summary_rejections(invalid_kwargs: dict[str, object]) -> None:
@@ -103,7 +117,9 @@ def test_vehicle_catalog_page_valid() -> None:
     item = VehicleSummary(
         vin="1HGCR2F85HA000000",
         make="HONDA",
+        has_conflicts=False,
         revision_number=1,
+        synthetic=False,
     )
     page = VehicleCatalogPage(
         items=[item],

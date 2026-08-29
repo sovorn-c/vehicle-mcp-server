@@ -338,7 +338,7 @@ class SourceObservationResponse(BaseModel):
 class VehicleSummary(BaseModel):
     """High-level summary of a canonical vehicle for catalog discovery."""
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
 
     vin: str = Field(description="Canonical 17-character VIN")
     make: str | None = Field(default=None, description="Reconciled vehicle make")
@@ -348,11 +348,9 @@ class VehicleSummary(BaseModel):
     confidence_score: float | None = Field(
         default=None, description="Overall confidence score (0.0 through 1.0)"
     )
-    has_conflicts: bool = Field(
-        default=False, description="True if any unresolved field conflicts exist"
-    )
-    revision_number: int = Field(default=1, description="Latest revision number")
-    synthetic: bool = Field(default=False, description="True if record incorporates synthetic data")
+    has_conflicts: bool = Field(description="True if any unresolved field conflicts exist")
+    revision_number: int = Field(description="Latest revision number")
+    synthetic: bool = Field(description="True if record incorporates synthetic data")
 
     @field_validator("vin", mode="before")
     @classmethod
@@ -380,7 +378,7 @@ class VehicleSummary(BaseModel):
 class VehicleCatalogPage(BaseModel):
     """Paginated collection of canonical vehicle summaries."""
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
 
     items: list[VehicleSummary] = Field(description="List of vehicle summaries")
     total: int = Field(ge=0, description="Total canonical vehicles matching query")
