@@ -50,3 +50,7 @@ def test_compose_file_loopback_only() -> None:
     # Host port mapping must be explicitly bound to loopback 127.0.0.1
     assert "127.0.0.1:" in content
     assert "0.0.0.0:8080" not in content
+
+    # Linux CI host gateway support
+    assert "extra_hosts:" in content
+    assert "host.docker.internal:host-gateway" in content

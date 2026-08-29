@@ -4,15 +4,20 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
+from mcp.server.mcpserver.utilities.func_metadata import ArgModelBase
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 VIN_PATTERN = re.compile(r"^[A-HJ-NPR-Z0-9]{17}$")
 
 
-class ListVehiclesInput(BaseModel):
-    """Input parameters for listing a page of canonical vehicles from the catalog."""
+class StrictToolInputBase(ArgModelBase):
+    """Base class for strictly validated MCP tool inputs with extra-field rejection."""
 
     model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
+
+
+class ListVehiclesInput(StrictToolInputBase):
+    """Input parameters for listing a page of canonical vehicles from the catalog."""
 
     limit: int = Field(
         default=20,
@@ -27,10 +32,8 @@ class ListVehiclesInput(BaseModel):
     )
 
 
-class LookupVehicleInput(BaseModel):
+class LookupVehicleInput(StrictToolInputBase):
     """Input parameters for looking up a canonical vehicle by VIN."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
 
     vin: str = Field(
         description="17-character Vehicle Identification Number (excluding letters I, O, Q)"
@@ -52,10 +55,8 @@ class LookupVehicleInput(BaseModel):
 FIELD_NAME_PATTERN = re.compile(r"^[a-z0-9_]{1,64}$")
 
 
-class ExplainVehicleFieldInput(BaseModel):
+class ExplainVehicleFieldInput(StrictToolInputBase):
     """Input parameters for explaining one canonical vehicle field."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
 
     vin: str = Field(
         description="17-character Vehicle Identification Number (excluding letters I, O, Q)"
@@ -87,10 +88,8 @@ class ExplainVehicleFieldInput(BaseModel):
         return cleaned
 
 
-class GetVehicleHistoryInput(BaseModel):
+class GetVehicleHistoryInput(StrictToolInputBase):
     """Input parameters for retrieving vehicle revision history."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
 
     vin: str = Field(
         description="17-character Vehicle Identification Number (excluding letters I, O, Q)"
@@ -120,10 +119,8 @@ class GetVehicleHistoryInput(BaseModel):
         return cleaned
 
 
-class GetVehicleRevisionInput(BaseModel):
+class GetVehicleRevisionInput(StrictToolInputBase):
     """Input parameters for retrieving one exact immutable canonical revision."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
 
     vin: str = Field(
         description="17-character Vehicle Identification Number (excluding letters I, O, Q)"
@@ -149,10 +146,8 @@ class GetVehicleRevisionInput(BaseModel):
 OBSERVATION_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_\-\:]{1,128}$")
 
 
-class GetSourceObservationInput(BaseModel):
+class GetSourceObservationInput(StrictToolInputBase):
     """Input parameters for retrieving one exact source observation."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
 
     observation_id: str = Field(description="Bounded identifier of the source observation")
 
@@ -341,28 +336,23 @@ class VehicleSummary(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
 
     vin: str = Field(description="Canonical 17-character VIN")
-    make: str | None = Field(default=None, description="Reconciled vehicle make")
-    model: str | None = Field(default=None, description="Reconciled vehicle model")
-    year: int | None = Field(default=None, description="Reconciled model year")
-    registration_status: str | None = Field(default=None, description="Current registration status")
-    confidence_score: float | None = Field(
-        default=None, description="Overall confidence score (0.0 through 1.0)"
-    )
+    make: str | None = Field(description="Reconciled vehicle make")
+    model: str | None = Field(description="Reconciled vehicle model")
+    year: int | None = Field(description="Reconciled model year")
+    registration_status: str | None = Field(description="Current registration status")
+    confidence_score: float | None = Field(description="Overall confidence score (0.0 through 1.0)")
     has_conflicts: bool = Field(description="True if any unresolved field conflicts exist")
     revision_number: int = Field(description="Latest revision number")
     synthetic: bool = Field(description="True if record incorporates synthetic data")
 
-    @field_validator("vin", mode="before")
+    @field_validator("vin")
     @classmethod
-    def normalize_vin(cls, v: object) -> str:
-        if not isinstance(v, str):
-            raise ValueError("VIN must be a string")
-        cleaned = v.strip().upper()
-        if not VIN_PATTERN.match(cleaned):
+    def validate_vin(cls, v: str) -> str:
+        if not isinstance(v, str) or not VIN_PATTERN.match(v):
             raise ValueError(
                 "VIN must be exactly 17 ASCII alphanumeric characters excluding letters I, O, and Q"
             )
-        return cleaned
+        return v
 
     @field_validator("confidence_score")
     @classmethod

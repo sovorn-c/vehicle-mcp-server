@@ -62,3 +62,17 @@ def test_demo_client_does_not_suppress_http_parity_failures() -> None:
     assert "[NOTE] Streamable HTTP verification:" not in demo_source, (
         "demo.py must fail closed on Streamable HTTP verification failure"
     )
+
+
+def test_demo_client_asserts_five_record_catalog_and_http_payload_parity() -> None:
+    demo_source = Path("src/vehicle_mcp_server/demo.py").read_text()
+    assert 'catalog.get("total") == 5' in demo_source
+    assert 'len(catalog["items"]) == 5' in demo_source
+    assert "h_cat_data == catalog" in demo_source
+    assert "h_data == data" in demo_source
+
+
+def test_smoke_script_signal_trap_exits_cleanly() -> None:
+    smoke_source = Path("scripts/smoke-local.sh").read_text()
+    assert "handle_signal" in smoke_source
+    assert "exit 130" in smoke_source

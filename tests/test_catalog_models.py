@@ -74,6 +74,11 @@ def test_vehicle_summary_valid() -> None:
 def test_vehicle_summary_nullable_fields() -> None:
     summary = VehicleSummary(
         vin="1HGCR2F85HA000000",
+        make=None,
+        model=None,
+        year=None,
+        registration_status=None,
+        confidence_score=None,
         has_conflicts=False,
         revision_number=1,
         synthetic=False,
@@ -97,15 +102,52 @@ def test_vehicle_summary_nullable_fields() -> None:
         # Strict mode: string year rejected
         {
             "vin": "1HGCR2F85HA000000",
+            "make": "HONDA",
+            "model": "ACCORD",
             "year": "2017",
+            "registration_status": "CURRENT",
+            "confidence_score": 0.85,
             "has_conflicts": False,
             "revision_number": 1,
             "synthetic": False,
         },
-        # Missing required summary fields
+        # Missing required summary fields (even nullable ones must not be omitted from wire schema)
+        {
+            "vin": "1HGCR2F85HA000000",
+            "model": "ACCORD",
+            "year": 2017,
+            "registration_status": "CURRENT",
+            "confidence_score": 0.85,
+            "has_conflicts": False,
+            "revision_number": 1,
+            "synthetic": False,
+        },
         {"vin": "1HGCR2F85HA000000", "revision_number": 1, "synthetic": False},
         {"vin": "1HGCR2F85HA000000", "has_conflicts": False, "synthetic": False},
         {"vin": "1HGCR2F85HA000000", "has_conflicts": False, "revision_number": 1},
+        # Reject un-normalized VINs from upstream (lowercase or whitespace-padded)
+        {
+            "vin": "1hgcr2f85ha000000",
+            "make": "HONDA",
+            "model": "ACCORD",
+            "year": 2017,
+            "registration_status": "CURRENT",
+            "confidence_score": 0.85,
+            "has_conflicts": False,
+            "revision_number": 1,
+            "synthetic": False,
+        },
+        {
+            "vin": " 1HGCR2F85HA000000 ",
+            "make": "HONDA",
+            "model": "ACCORD",
+            "year": 2017,
+            "registration_status": "CURRENT",
+            "confidence_score": 0.85,
+            "has_conflicts": False,
+            "revision_number": 1,
+            "synthetic": False,
+        },
     ],
 )
 def test_vehicle_summary_rejections(invalid_kwargs: dict[str, object]) -> None:
@@ -117,6 +159,10 @@ def test_vehicle_catalog_page_valid() -> None:
     item = VehicleSummary(
         vin="1HGCR2F85HA000000",
         make="HONDA",
+        model=None,
+        year=None,
+        registration_status=None,
+        confidence_score=None,
         has_conflicts=False,
         revision_number=1,
         synthetic=False,

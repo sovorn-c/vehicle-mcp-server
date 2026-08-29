@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import sys
 from collections.abc import Awaitable, Callable
 from urllib.parse import quote
 
@@ -60,19 +61,6 @@ class VehiclePipelineClient:
         self._sleep = sleep_func
         self._base_url = str(config.pipeline_base_url).rstrip("/")
 
-    def _check_response_size(self, response: httpx2.Response, url: str) -> None:
-        content_length = response.headers.get("content-length")
-        if content_length and int(content_length) > self._config.max_response_bytes:
-            raise PipelineContractError(
-                f"Pipeline response size header ({content_length} bytes) exceeds ceiling "
-                f"of {self._config.max_response_bytes} bytes for {url}"
-            )
-        if len(response.content) > self._config.max_response_bytes:
-            raise PipelineContractError(
-                f"Pipeline response body ({len(response.content)} bytes) exceeds ceiling "
-                f"of {self._config.max_response_bytes} bytes for {url}"
-            )
-
     async def _request_with_retry(
         self,
         method: str,
@@ -84,7 +72,7 @@ class VehiclePipelineClient:
 
         for attempt in range(1, self._config.max_attempts + 1):
             try:
-                response = await self._http_client.request(
+                request = self._http_client.build_request(
                     method=method,
                     url=url,
                     params=params,
@@ -95,6 +83,7 @@ class VehiclePipelineClient:
                         pool=self._config.pool_timeout,
                     ),
                 )
+                response = await self._http_client.send(request, stream=True)
             except asyncio.CancelledError:
                 raise
             except httpx2.TimeoutException as exc:
@@ -114,12 +103,42 @@ class VehiclePipelineClient:
                     continue
                 raise last_error from exc
 
-            if response.status_code in (429, 502, 503, 504):
+            content_length = response.headers.get("content-length")
+            if content_length and int(content_length) > self._config.max_response_bytes:
+                await response.aclose()
+                raise PipelineContractError(
+                    f"Pipeline response size header ({content_length} bytes) exceeds ceiling "
+                    f"of {self._config.max_response_bytes} bytes for {url}"
+                )
+
+            body_chunks: list[bytes] = []
+            total_bytes = 0
+            try:
+                async for chunk in response.aiter_bytes():
+                    total_bytes += len(chunk)
+                    if total_bytes > self._config.max_response_bytes:
+                        await response.aclose()
+                        raise PipelineContractError(
+                            f"Pipeline response body ({total_bytes} bytes) exceeds ceiling "
+                            f"of {self._config.max_response_bytes} bytes for {url}"
+                        )
+                    body_chunks.append(chunk)
+            finally:
+                await response.aclose()
+
+            buffered_response = httpx2.Response(
+                status_code=response.status_code,
+                headers=response.headers,
+                content=b"".join(body_chunks),
+                request=request,
+            )
+
+            if buffered_response.status_code in (429, 502, 503, 504):
                 last_error = PipelineUnavailableError(
-                    f"Pipeline returned service unavailable status {response.status_code}"
+                    f"Pipeline returned service unavailable status {buffered_response.status_code}"
                 )
                 if attempt < self._config.max_attempts:
-                    retry_after = response.headers.get("retry-after")
+                    retry_after = buffered_response.headers.get("retry-after")
                     delay = delays[attempt - 1] if attempt - 1 < len(delays) else 0.4
                     if retry_after:
                         try:
@@ -132,7 +151,7 @@ class VehiclePipelineClient:
                     continue
                 raise last_error
 
-            return response
+            return buffered_response
 
         if last_error:
             raise last_error
@@ -155,7 +174,6 @@ class VehiclePipelineClient:
         response = await self._request_with_retry("GET", url, params=params)
 
         if response.status_code == 200:
-            self._check_response_size(response, url)
             try:
                 data = response.json()
             except Exception as exc:
@@ -166,8 +184,9 @@ class VehiclePipelineClient:
             try:
                 return VehicleCatalogPage.model_validate(data)
             except ValidationError as exc:
+                print(f"[CONTRACT_ERROR] {url} catalog validation failed: {exc}", file=sys.stderr)
                 raise PipelineContractError(
-                    f"Pipeline catalog page violates VehicleCatalogPage contract: {exc}"
+                    "Pipeline catalog page violates VehicleCatalogPage contract."
                 ) from exc
 
         if response.status_code == 422:
@@ -186,7 +205,6 @@ class VehiclePipelineClient:
         response = await self._request_with_retry("GET", url)
 
         if response.status_code == 200:
-            self._check_response_size(response, url)
             try:
                 data = response.json()
             except Exception as exc:
@@ -197,8 +215,12 @@ class VehiclePipelineClient:
             try:
                 return VehicleRevisionResponse.model_validate(data)
             except ValidationError as exc:
+                print(
+                    f"[CONTRACT_ERROR] {url} vehicle revision validation failed: {exc}",
+                    file=sys.stderr,
+                )
                 raise PipelineContractError(
-                    f"Pipeline response violates VehicleRevisionResponse contract: {exc}"
+                    "Pipeline response violates VehicleRevisionResponse contract."
                 ) from exc
 
         if response.status_code == 404:
@@ -227,7 +249,6 @@ class VehiclePipelineClient:
         response = await self._request_with_retry("GET", url, params=params)
 
         if response.status_code == 200:
-            self._check_response_size(response, url)
             try:
                 data = response.json()
             except Exception as exc:
@@ -244,8 +265,12 @@ class VehiclePipelineClient:
             try:
                 return [VehicleRevisionResponse.model_validate(item) for item in data]
             except ValidationError as exc:
+                print(
+                    f"[CONTRACT_ERROR] {url} history item validation failed: {exc}",
+                    file=sys.stderr,
+                )
                 raise PipelineContractError(
-                    f"Pipeline history item violates VehicleRevisionResponse contract: {exc}"
+                    "Pipeline history item violates VehicleRevisionResponse contract."
                 ) from exc
 
         if response.status_code == 404:
@@ -269,7 +294,6 @@ class VehiclePipelineClient:
         response = await self._request_with_retry("GET", url)
 
         if response.status_code == 200:
-            self._check_response_size(response, url)
             try:
                 data = response.json()
             except Exception as exc:
@@ -280,8 +304,9 @@ class VehiclePipelineClient:
             try:
                 return VehicleRevisionResponse.model_validate(data)
             except ValidationError as exc:
+                print(f"[CONTRACT_ERROR] {url} revision validation failed: {exc}", file=sys.stderr)
                 raise PipelineContractError(
-                    f"Pipeline revision violates VehicleRevisionResponse contract: {exc}"
+                    "Pipeline revision violates VehicleRevisionResponse contract."
                 ) from exc
 
         if response.status_code == 404:
@@ -308,7 +333,6 @@ class VehiclePipelineClient:
         response = await self._request_with_retry("GET", url)
 
         if response.status_code == 200:
-            self._check_response_size(response, url)
             try:
                 data = response.json()
             except Exception as exc:
@@ -319,8 +343,12 @@ class VehiclePipelineClient:
             try:
                 obs = SourceObservationResponse.model_validate(data)
             except ValidationError as exc:
+                print(
+                    f"[CONTRACT_ERROR] {url} observation validation failed: {exc}",
+                    file=sys.stderr,
+                )
                 raise PipelineContractError(
-                    f"Pipeline observation violates SourceObservationResponse contract: {exc}"
+                    "Pipeline observation violates SourceObservationResponse contract."
                 ) from exc
 
             computed_hash = hashlib.sha256(obs.raw_payload.encode("utf-8")).hexdigest()

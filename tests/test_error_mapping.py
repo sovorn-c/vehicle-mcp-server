@@ -105,3 +105,22 @@ async def test_safe_tool_boundary_cancellation_not_swallowed() -> None:
 
     with pytest.raises(asyncio.CancelledError):
         await safe_tool_boundary("test_tool", cancelled_fn)
+
+
+@pytest.mark.asyncio
+async def test_safe_tool_boundary_redacts_upstream_validation_details() -> None:
+    sensitive_payload = "SECRET_TOKEN_OR_MALFORMED_UPSTREAM_VALUE"
+    contract_err = PipelineContractError(f"Validation failed for input_value='{sensitive_payload}'")
+
+    async def failing_fn() -> None:
+        raise contract_err
+
+    with pytest.raises(ToolError) as exc_info:
+        await safe_tool_boundary("test_tool", failing_fn)
+
+    raw_json = str(exc_info.value)
+    err = SafeError.model_validate_json(raw_json)
+    assert err.category == SafeErrorCategory.PIPELINE_CONTRACT_ERROR
+    assert sensitive_payload not in raw_json
+    assert "input_value" not in raw_json
+    assert err.message == "Upstream pipeline response violated expected contract schema."

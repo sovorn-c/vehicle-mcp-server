@@ -3,6 +3,7 @@
 import asyncio
 import sys
 from collections.abc import Awaitable, Callable
+from typing import Any
 
 from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import ValidationError
@@ -45,10 +46,16 @@ async def safe_tool_boundary[T](
     except asyncio.CancelledError:
         raise
     except ValidationError as exc:
+        field_errors: list[str] = []
+        for err in exc.errors():
+            loc = ".".join(str(x) for x in err.get("loc", [])) or "parameter"
+            msg = err.get("msg", "invalid value")
+            field_errors.append(f"{loc}: {msg}")
+        joined = "; ".join(field_errors)
         raise ToolError(
             SafeError(
                 category=SafeErrorCategory.INVALID_INPUT,
-                message=f"Invalid parameter input for {tool_name}: {exc}",
+                message=f"Invalid parameter input for {tool_name}: {joined}",
                 retryable=False,
                 remediation="Verify all arguments conform to tool parameter specifications.",
             ).model_dump_json()
@@ -94,10 +101,11 @@ async def safe_tool_boundary[T](
             ).model_dump_json()
         ) from exc
     except PipelineContractError as exc:
+        print(f"[CONTRACT_ERROR] {tool_name}: {exc}", file=sys.stderr)
         raise ToolError(
             SafeError(
                 category=SafeErrorCategory.PIPELINE_CONTRACT_ERROR,
-                message=f"Pipeline contract or schema violation: {exc}",
+                message="Upstream pipeline response violated expected contract schema.",
                 retryable=False,
                 remediation="Verify compatibility between MCP server and pipeline version.",
             ).model_dump_json()
@@ -137,11 +145,13 @@ async def safe_tool_boundary[T](
 async def execute_lookup_vehicle(
     client: VehiclePipelineClient,
     vin: str,
+    raw_args: dict[str, Any] | None = None,
 ) -> VehicleRevisionResponse:
     """Execute canonical vehicle lookup with strict validation and safe error projection."""
 
     async def _action() -> VehicleRevisionResponse:
-        validated = LookupVehicleInput(vin=vin)
+        args_to_validate = raw_args if raw_args is not None else {"vin": vin}
+        validated = LookupVehicleInput.model_validate(args_to_validate)
         return await client.get_current_vehicle(validated.vin)
 
     return await safe_tool_boundary("lookup_vehicle", _action)
@@ -151,11 +161,13 @@ async def execute_list_vehicles(
     client: VehiclePipelineClient,
     limit: int = 20,
     offset: int = 0,
+    raw_args: dict[str, Any] | None = None,
 ) -> VehicleCatalogPage:
     """Execute bounded vehicle catalog discovery query."""
 
     async def _action() -> VehicleCatalogPage:
-        validated = ListVehiclesInput(limit=limit, offset=offset)
+        args_to_validate = raw_args if raw_args is not None else {"limit": limit, "offset": offset}
+        validated = ListVehiclesInput.model_validate(args_to_validate)
         return await client.list_vehicles(
             limit=validated.limit,
             offset=validated.offset,
@@ -168,11 +180,15 @@ async def execute_explain_vehicle_field(
     client: VehiclePipelineClient,
     vin: str,
     field_name: str,
+    raw_args: dict[str, Any] | None = None,
 ) -> FieldExplanationResult:
     """Execute field explanation by validating inputs, reading pipeline, and projecting evidence."""
 
     async def _action() -> FieldExplanationResult:
-        validated = ExplainVehicleFieldInput(vin=vin, field_name=field_name)
+        args_to_validate = (
+            raw_args if raw_args is not None else {"vin": vin, "field_name": field_name}
+        )
+        validated = ExplainVehicleFieldInput.model_validate(args_to_validate)
         vehicle = await client.get_current_vehicle(validated.vin)
         return project_field_explanation(vehicle, validated.field_name)
 
@@ -184,15 +200,17 @@ async def execute_get_vehicle_history(
     vin: str,
     limit: int = 20,
     before_revision: int | None = None,
+    raw_args: dict[str, Any] | None = None,
 ) -> list[VehicleRevisionResponse]:
     """Execute bounded vehicle revision history query."""
 
     async def _action() -> list[VehicleRevisionResponse]:
-        validated = GetVehicleHistoryInput(
-            vin=vin,
-            limit=limit,
-            before_revision=before_revision,
+        args_to_validate: dict[str, Any] = (
+            raw_args
+            if raw_args is not None
+            else {"vin": vin, "limit": limit, "before_revision": before_revision}
         )
+        validated = GetVehicleHistoryInput.model_validate(args_to_validate)
         return await client.get_vehicle_history(
             validated.vin,
             limit=validated.limit,
@@ -206,11 +224,15 @@ async def execute_get_vehicle_revision(
     client: VehiclePipelineClient,
     vin: str,
     revision_number: int,
+    raw_args: dict[str, Any] | None = None,
 ) -> VehicleRevisionResponse:
     """Execute exact vehicle canonical revision retrieval."""
 
     async def _action() -> VehicleRevisionResponse:
-        validated = GetVehicleRevisionInput(vin=vin, revision_number=revision_number)
+        args_to_validate = (
+            raw_args if raw_args is not None else {"vin": vin, "revision_number": revision_number}
+        )
+        validated = GetVehicleRevisionInput.model_validate(args_to_validate)
         return await client.get_vehicle_revision(validated.vin, validated.revision_number)
 
     return await safe_tool_boundary("get_vehicle_revision", _action)
@@ -219,11 +241,13 @@ async def execute_get_vehicle_revision(
 async def execute_get_source_observation(
     client: VehiclePipelineClient,
     observation_id: str,
+    raw_args: dict[str, Any] | None = None,
 ) -> SourceObservationResponse:
     """Execute exact source observation retrieval with hash integrity validation."""
 
     async def _action() -> SourceObservationResponse:
-        validated = GetSourceObservationInput(observation_id=observation_id)
+        args_to_validate = raw_args if raw_args is not None else {"observation_id": observation_id}
+        validated = GetSourceObservationInput.model_validate(args_to_validate)
         return await client.get_source_observation(validated.observation_id)
 
     return await safe_tool_boundary("get_source_observation", _action)

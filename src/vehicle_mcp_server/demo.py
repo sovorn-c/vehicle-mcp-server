@@ -64,7 +64,12 @@ async def run_demonstration(
         catalog = _extract_tool_payload(cat_res)
         assert isinstance(catalog, dict)
         assert "items" in catalog
-        assert len(catalog["items"]) >= 1, "Catalog must not be empty"
+        assert catalog.get("total") == 5, (
+            f"Expected total 5 canonical vehicles, got {catalog.get('total')}"
+        )
+        assert len(catalog["items"]) == 5, (
+            f"Expected 5 items in catalog, got {len(catalog['items'])}"
+        )
         print(
             f"      Discovered {len(catalog['items'])} vehicles "
             f"(total in catalog: {catalog.get('total', len(catalog['items']))})"
@@ -279,11 +284,12 @@ async def run_demonstration(
         # Test list_vehicles parity over HTTP
         h_cat = await http_session.call_tool(
             "list_vehicles",
-            arguments={"limit": 5, "offset": 0},
+            arguments={"limit": 20, "offset": 0},
         )
         h_cat_data = _extract_tool_payload(h_cat)
-        assert isinstance(h_cat_data, dict), "HTTP list_vehicles response must be dict"
-        assert "items" in h_cat_data, "HTTP list_vehicles response must contain items"
+        assert h_cat_data == catalog, (
+            "HTTP list_vehicles response must match stdio catalog discovery exactly"
+        )
         print("      HTTP list_vehicles matches stdio discovery outcome!")
 
         # Test clean lookup parity
@@ -292,7 +298,9 @@ async def run_demonstration(
             arguments={"vin": "1HGCR2F85HA000000"},
         )
         h_data = _extract_tool_payload(h_res)
-        assert h_data["canonical_fields"]["make"] == "HONDA"
+        assert h_data == data, (
+            "HTTP lookup_vehicle response must match stdio canonical lookup exactly"
+        )
         print("      HTTP lookup_vehicle matches stdio canonical outcome!")
 
     print("\n==================================================================")

@@ -27,6 +27,15 @@ from vehicle_mcp_server.tools import (
 )
 
 
+def _extract_raw_arguments(ctx: Context) -> dict[str, Any] | None:
+    params = getattr(ctx.request_context, "params", None)
+    if isinstance(params, dict):
+        args = params.get("arguments")
+        if isinstance(args, dict):
+            return args
+    return None
+
+
 def create_server(
     config: ServerConfig | None = None,
     transport: httpx2.AsyncBaseTransport | None = None,
@@ -70,6 +79,7 @@ def create_server(
             pipeline_client,
             limit=limit,
             offset=offset,
+            raw_args=_extract_raw_arguments(ctx),
         )
 
     @server.tool(
@@ -83,7 +93,11 @@ def create_server(
         pipeline_client: VehiclePipelineClient = ctx.request_context.lifespan_context[
             "pipeline_client"
         ]
-        return await execute_lookup_vehicle(pipeline_client, vin)
+        return await execute_lookup_vehicle(
+            pipeline_client,
+            vin=vin,
+            raw_args=_extract_raw_arguments(ctx),
+        )
 
     @server.tool(
         name="explain_vehicle_field",
@@ -101,7 +115,12 @@ def create_server(
         pipeline_client: VehiclePipelineClient = ctx.request_context.lifespan_context[
             "pipeline_client"
         ]
-        return await execute_explain_vehicle_field(pipeline_client, vin, field_name)
+        return await execute_explain_vehicle_field(
+            pipeline_client,
+            vin=vin,
+            field_name=field_name,
+            raw_args=_extract_raw_arguments(ctx),
+        )
 
     @server.tool(
         name="get_vehicle_history",
@@ -124,6 +143,7 @@ def create_server(
             vin=vin,
             limit=limit,
             before_revision=before_revision,
+            raw_args=_extract_raw_arguments(ctx),
         )
 
     @server.tool(
@@ -145,6 +165,7 @@ def create_server(
             pipeline_client,
             vin=vin,
             revision_number=revision_number,
+            raw_args=_extract_raw_arguments(ctx),
         )
 
     @server.tool(
@@ -164,6 +185,7 @@ def create_server(
         return await execute_get_source_observation(
             pipeline_client,
             observation_id=observation_id,
+            raw_args=_extract_raw_arguments(ctx),
         )
 
     return server

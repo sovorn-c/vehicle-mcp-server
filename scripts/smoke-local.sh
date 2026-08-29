@@ -45,7 +45,15 @@ cleanup() {
     (cd "${ROOT_DIR}" && docker compose -p "${PROJECT_NAME_MCP}" down -v --remove-orphans >/dev/null 2>&1 || true)
     (cd "${PIPELINE_DIR}" && docker compose -p "${PROJECT_NAME_PIPELINE}" down -v --remove-orphans >/dev/null 2>&1 || true)
 }
-trap cleanup EXIT INT TERM
+
+handle_signal() {
+    trap - EXIT INT TERM
+    cleanup
+    exit 130
+}
+
+trap cleanup EXIT
+trap handle_signal INT TERM
 
 echo "==> Starting pipeline service in ${PIPELINE_DIR}..."
 (

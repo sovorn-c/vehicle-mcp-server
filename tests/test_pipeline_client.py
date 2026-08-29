@@ -150,3 +150,35 @@ async def test_get_current_vehicle_unavailable() -> None:
         )
         with pytest.raises(PipelineUnavailableError):
             await client.get_current_vehicle("1HGCR2F85HA000000")
+
+
+@pytest.mark.asyncio
+async def test_streaming_response_size_ceiling_enforced() -> None:
+    # Handler emits chunks exceeding ceiling
+    def handler(_request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(200, content=b"x" * 20000)
+
+    transport = httpx2.MockTransport(handler)
+    async with httpx2.AsyncClient(transport=transport) as http_client:
+        client = VehiclePipelineClient(
+            config=ServerConfig(pipeline_base_url="http://test-pipeline", max_response_bytes=10240),
+            http_client=http_client,
+        )
+        with pytest.raises(PipelineContractError, match="exceeds ceiling"):
+            await client.get_current_vehicle("1HGCR2F85HA000000")
+
+
+@pytest.mark.asyncio
+async def test_streaming_response_size_ceiling_enforced_on_error_status() -> None:
+    # Handler emits 503 status with massive body exceeding ceiling
+    def handler(_request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(503, content=b"e" * 20000)
+
+    transport = httpx2.MockTransport(handler)
+    async with httpx2.AsyncClient(transport=transport) as http_client:
+        client = VehiclePipelineClient(
+            config=ServerConfig(pipeline_base_url="http://test-pipeline", max_response_bytes=10240),
+            http_client=http_client,
+        )
+        with pytest.raises(PipelineContractError, match="exceeds ceiling"):
+            await client.get_current_vehicle("1HGCR2F85HA000000")

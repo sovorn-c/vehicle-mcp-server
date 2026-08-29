@@ -148,6 +148,12 @@ async def test_list_vehicles_empty_catalog() -> None:
         {"limit": 101},
         {"limit": -1},
         {"offset": -1},
+        {"limit": "20"},  # String coercion rejected
+        {"limit": 2.0},  # Float rejected
+        {"limit": True},  # Boolean rejected
+        {"offset": False},  # Boolean rejected
+        {"extra": "unexpected"},  # Unknown fields rejected
+        {"limit": 20, "extra": "unexpected"},  # Extra fields with valid limit rejected
     ],
 )
 async def test_list_vehicles_invalid_bounds_fail_safely(invalid_args: dict[str, Any]) -> None:
