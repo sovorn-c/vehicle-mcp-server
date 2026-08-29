@@ -84,7 +84,41 @@ class VehiclePipelineClient:
                     ),
                 )
                 response = await self._http_client.send(request, stream=True)
+                try:
+                    content_length = response.headers.get("content-length")
+                    if content_length:
+                        try:
+                            if int(content_length) > self._config.max_response_bytes:
+                                raise PipelineContractError(
+                                    f"Pipeline response size header ({content_length} bytes) "
+                                    f"exceeds ceiling of {self._config.max_response_bytes} "
+                                    f"bytes for {url}"
+                                )
+                        except ValueError:
+                            pass
+
+                    body_chunks: list[bytes] = []
+                    total_bytes = 0
+                    async for chunk in response.aiter_bytes():
+                        total_bytes += len(chunk)
+                        if total_bytes > self._config.max_response_bytes:
+                            raise PipelineContractError(
+                                f"Pipeline response body ({total_bytes} bytes) exceeds ceiling "
+                                f"of {self._config.max_response_bytes} bytes for {url}"
+                            )
+                        body_chunks.append(chunk)
+                finally:
+                    await response.aclose()
+
+                buffered_response = httpx2.Response(
+                    status_code=response.status_code,
+                    headers=response.headers,
+                    content=b"".join(body_chunks),
+                    request=request,
+                )
             except asyncio.CancelledError:
+                raise
+            except PipelineContractError:
                 raise
             except httpx2.TimeoutException as exc:
                 last_error = PipelineTimeoutError(f"Request to pipeline timed out: {url}")
@@ -102,36 +136,6 @@ class VehiclePipelineClient:
                     await self._sleep(delay)
                     continue
                 raise last_error from exc
-
-            content_length = response.headers.get("content-length")
-            if content_length and int(content_length) > self._config.max_response_bytes:
-                await response.aclose()
-                raise PipelineContractError(
-                    f"Pipeline response size header ({content_length} bytes) exceeds ceiling "
-                    f"of {self._config.max_response_bytes} bytes for {url}"
-                )
-
-            body_chunks: list[bytes] = []
-            total_bytes = 0
-            try:
-                async for chunk in response.aiter_bytes():
-                    total_bytes += len(chunk)
-                    if total_bytes > self._config.max_response_bytes:
-                        await response.aclose()
-                        raise PipelineContractError(
-                            f"Pipeline response body ({total_bytes} bytes) exceeds ceiling "
-                            f"of {self._config.max_response_bytes} bytes for {url}"
-                        )
-                    body_chunks.append(chunk)
-            finally:
-                await response.aclose()
-
-            buffered_response = httpx2.Response(
-                status_code=response.status_code,
-                headers=response.headers,
-                content=b"".join(body_chunks),
-                request=request,
-            )
 
             if buffered_response.status_code in (429, 502, 503, 504):
                 last_error = PipelineUnavailableError(

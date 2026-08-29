@@ -4,13 +4,12 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from mcp.server.mcpserver.utilities.func_metadata import ArgModelBase
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 VIN_PATTERN = re.compile(r"^[A-HJ-NPR-Z0-9]{17}$")
 
 
-class StrictToolInputBase(ArgModelBase):
+class StrictToolInputBase(BaseModel):
     """Base class for strictly validated MCP tool inputs with extra-field rejection."""
 
     model_config = ConfigDict(frozen=True, extra="forbid", strict=True)

@@ -182,3 +182,50 @@ async def test_streaming_response_size_ceiling_enforced_on_error_status() -> Non
         )
         with pytest.raises(PipelineContractError, match="exceeds ceiling"):
             await client.get_current_vehicle("1HGCR2F85HA000000")
+
+
+@pytest.mark.asyncio
+async def test_streaming_chunked_ceiling_without_content_length() -> None:
+    # Generator emits chunks without content-length header
+    async def chunk_generator():
+        for _ in range(25):
+            yield b"y" * 1000
+
+    def handler(_request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(200, content=chunk_generator(), headers={})
+
+    transport = httpx2.MockTransport(handler)
+    async with httpx2.AsyncClient(transport=transport) as http_client:
+        client = VehiclePipelineClient(
+            config=ServerConfig(pipeline_base_url="http://test-pipeline", max_response_bytes=10240),
+            http_client=http_client,
+        )
+        with pytest.raises(PipelineContractError, match="exceeds ceiling"):
+            await client.get_current_vehicle("1HGCR2F85HA000000")
+
+
+@pytest.mark.asyncio
+async def test_streaming_midstream_read_timeout_retried() -> None:
+    attempts = 0
+
+    async def failing_stream():
+        nonlocal attempts
+        attempts += 1
+        yield b"initial_chunk"
+        raise httpx2.ReadTimeout("Stream hung mid-transfer")
+
+    def handler(_request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(200, content=failing_stream())
+
+    transport = httpx2.MockTransport(handler)
+    async with httpx2.AsyncClient(transport=transport) as http_client:
+        client = VehiclePipelineClient(
+            config=ServerConfig(
+                pipeline_base_url="http://test-pipeline",
+                max_attempts=3,
+            ),
+            http_client=http_client,
+        )
+        with pytest.raises(PipelineTimeoutError):
+            await client.get_current_vehicle("1HGCR2F85HA000000")
+        assert attempts == 3
