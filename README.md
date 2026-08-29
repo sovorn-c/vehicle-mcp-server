@@ -4,7 +4,7 @@ Audited New Zealand vehicle intelligence server for Model Context Protocol (MCP)
 
 This server provides AI assistants and automated agents with access to audited vehicle records, reconciliation confidence scores, conflicting candidate values, monotonic revision histories, and immutable source observation audit trails.
 
-All pipeline interactions occur over an authenticated, defensive HTTP client boundary backed by the [nz-vehicle-data-pipeline](https://github.com/sovorn/nz-vehicle-data-pipeline).
+All pipeline interactions occur over a defensive HTTP client boundary backed by the [nz-vehicle-data-pipeline](https://github.com/sovorn-c/nz-vehicle-data-pipeline).
 
 ---
 

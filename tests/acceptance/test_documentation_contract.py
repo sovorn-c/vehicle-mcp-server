@@ -26,7 +26,12 @@ def test_documentation_contract() -> None:
     assert "Claude Desktop" in readme or "claude_desktop_config.json" in readme
 
     # Architecture and upstream relationship documented
-    assert "nz-vehicle-data-pipeline" in readme or "Pipeline" in readme
+    assert "https://github.com/sovorn-c/nz-vehicle-data-pipeline" in readme, (
+        "README.md must link to sovorn-c/nz-vehicle-data-pipeline"
+    )
+    assert "authenticated, defensive" not in readme, (
+        "README.md must not falsely claim local pipeline HTTP boundary is authenticated"
+    )
     assert "127.0.0.1" in readme or "localhost" in readme
     assert "scripts/smoke-local.sh" in readme
     assert "scripts/check.sh" in readme
