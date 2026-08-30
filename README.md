@@ -116,6 +116,27 @@ Docker Compose publishes the MCP endpoint on loopback at `127.0.0.1:8080`.
 
 ## Connect an MCP client
 
+The server is model- and client-agnostic. Any MCP client that supports stdio or Streamable HTTP can use the same six tools.
+
+### OpenAI Codex
+
+Register the stdio server with the Codex CLI. Replace `/path/to/vehicle-mcp-server` with the local repository path.
+
+```bash
+codex mcp add vehicle-intelligence \
+  --env VEHICLE_MCP_TRANSPORT=stdio \
+  --env VEHICLE_MCP_PIPELINE_BASE_URL=http://localhost:8000 \
+  -- uv run --directory /path/to/vehicle-mcp-server vehicle-mcp-server
+```
+
+Verify the shared Codex CLI and IDE-extension configuration:
+
+```bash
+codex mcp list
+```
+
+See the official [Codex MCP configuration guide](https://developers.openai.com/codex/mcp) for UI and `config.toml` alternatives.
+
 ### Claude Desktop
 
 Add this entry to `claude_desktop_config.json`. Replace `/path/to/vehicle-mcp-server` with the local repository path.
@@ -140,7 +161,14 @@ Add this entry to `claude_desktop_config.json`. Replace `/path/to/vehicle-mcp-se
 }
 ```
 
-The same stdio command works with other MCP clients that support local process servers.
+### Other MCP clients
+
+Use these connection values in clients that provide their own MCP configuration interface:
+
+| Transport | Connection |
+|---|---|
+| stdio | Command: `uv`; arguments: `run --directory /path/to/vehicle-mcp-server vehicle-mcp-server`; set the two environment variables shown above. |
+| Streamable HTTP | URL: `http://127.0.0.1:8080/mcp`; start the server in HTTP mode first. |
 
 ## Tool catalog
 
