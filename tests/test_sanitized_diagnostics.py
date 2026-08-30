@@ -58,17 +58,17 @@ def test_format_contract_validation_diagnostic_excludes_input_value() -> None:
     secret_marker = "SUPER_SECRET_UNTRUSTED_UPSTREAM_STRING"
 
     class SampleModel(BaseModel):
-        clean_field: str = Field(min_length=10)
-        number_field: int
+        vin: str = Field(min_length=10)
+        year: int
 
     with pytest.raises(ValidationError) as exc_info:
-        SampleModel(clean_field=secret_marker, number_field=secret_marker)  # type: ignore[arg-type]
+        SampleModel(vin=secret_marker, year=secret_marker)  # type: ignore[arg-type]
 
     diagnostic = format_contract_validation_diagnostic(exc_info.value)
 
     assert secret_marker not in diagnostic
     assert "input_value" not in diagnostic
-    assert "field='number_field' error='int_parsing'" in diagnostic
+    assert "field='year' error='int_parsing'" in diagnostic
 
 
 @pytest.mark.asyncio
@@ -325,3 +325,77 @@ async def test_safe_tool_boundary_sanitizes_pipeline_contract_error_logging(
     assert "\r" not in captured.err
     assert "\n" not in captured.err[:-1]  # Only the trailing newline from print
     assert "\x1b" not in captured.err
+
+
+@pytest.mark.asyncio
+async def test_nested_dict_key_redacted_in_confidence_field_scores(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Ensure arbitrary keys in nested dicts like field_scores are redacted to <key>."""
+    secret_key = "API_KEY_1234567890_SECRET"
+    malformed_payload = _make_valid_revision_dict()
+    # Invalidate field_scores with a string value for the secret key
+    assert isinstance(malformed_payload["confidence"], dict)
+    malformed_payload["confidence"]["field_scores"] = {secret_key: "not_an_int"}
+
+    transport = httpx2.MockTransport(lambda _: httpx2.Response(200, json=malformed_payload))
+    async with httpx2.AsyncClient(transport=transport) as http_client:
+        client = VehiclePipelineClient(_make_config(), http_client)
+        with pytest.raises(
+            PipelineContractError,
+            match="Pipeline response violates VehicleRevisionResponse contract.",
+        ):
+            await client.get_current_vehicle("1HGCR2F85HA000000")
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "[CONTRACT_ERROR]" in captured.err
+    assert "field='confidence.field_scores.<key>' error='int_parsing'" in captured.err
+    assert secret_key not in captured.err
+
+
+@pytest.mark.asyncio
+async def test_nested_dict_key_redacted_in_confidence_field_components(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Ensure arbitrary keys in nested dict of dicts like field_components are redacted."""
+    secret_key = "SECRET_NESTED_COMPONENT_TOKEN"
+    malformed_payload = _make_valid_revision_dict()
+    assert isinstance(malformed_payload["confidence"], dict)
+    malformed_payload["confidence"]["field_components"] = {"make": {secret_key: "not_an_int"}}
+
+    transport = httpx2.MockTransport(lambda _: httpx2.Response(200, json=malformed_payload))
+    async with httpx2.AsyncClient(transport=transport) as http_client:
+        client = VehiclePipelineClient(_make_config(), http_client)
+        with pytest.raises(
+            PipelineContractError,
+            match="Pipeline response violates VehicleRevisionResponse contract.",
+        ):
+            await client.get_current_vehicle("1HGCR2F85HA000000")
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "[CONTRACT_ERROR]" in captured.err
+    assert "field='confidence.field_components.make.<key>' error='int_parsing'" in captured.err
+    assert secret_key not in captured.err
+
+
+def test_format_contract_validation_diagnostic_bounds_error_count() -> None:
+    """Ensure diagnostic lines are bounded to 5 errors to prevent DoS via log flooding."""
+
+    class LargeModel(BaseModel):
+        f1: int
+        f2: int
+        f3: int
+        f4: int
+        f5: int
+        f6: int
+        f7: int
+
+    with pytest.raises(ValidationError) as exc_info:
+        LargeModel.model_validate({f"f{i}": "bad" for i in range(1, 8)})
+
+    diagnostic = format_contract_validation_diagnostic(exc_info.value)
+    assert "... (2 more contract errors)" in diagnostic
+    # Verify exactly 5 errors reported before truncation
+    assert diagnostic.count("error=") == 5

@@ -92,6 +92,11 @@ ALLOWED_FIELD_NAMES: frozenset[str] = frozenset(
         "source_system",
         "source_record_id",
         "retrieved_at",
+        # Confidence score components
+        "authority",
+        "agreement",
+        "freshness",
+        "validation",
         # SourceObservationResponse
         "ingestion_run_id",
         "raw_payload",
@@ -106,8 +111,10 @@ def format_contract_validation_diagnostic(exc: ValidationError) -> str:
     Guarantees no raw input values, payload fragments, PII, or attacker-controlled
     keys/control characters leak to logs (CWE-532, CWE-117).
     """
+    errors = exc.errors()
     items: list[str] = []
-    for err in exc.errors():
+    # Bound to first 5 errors to prevent log flooding (CWE-400)
+    for err in errors[:5]:
         err_type_raw = str(err.get("type", "contract_violation"))
         err_type = re.sub(r"[^a-zA-Z0-9_]", "_", err_type_raw)[:48]
 
@@ -122,12 +129,15 @@ def format_contract_validation_diagnostic(exc: ValidationError) -> str:
                 # For unexpected extra fields, redact attacker-controlled key name
                 sanitized_loc_tokens.append("<extra_field>")
             else:
-                # Sanitize unexpected token against control characters
-                clean = re.sub(r"[^a-zA-Z0-9_.-]", "_", str(token))[:32]
-                sanitized_loc_tokens.append(clean or "<unrecognized_field>")
+                # For dynamic dictionary keys or unallowlisted tokens, redact untrusted name
+                sanitized_loc_tokens.append("<key>")
 
         field_path = ".".join(sanitized_loc_tokens) or "root"
         items.append(f"field='{field_path}' error='{err_type}'")
+
+    if len(errors) > 5:
+        items.append(f"... ({len(errors) - 5} more contract errors)")
+
     return ", ".join(items)
 
 
