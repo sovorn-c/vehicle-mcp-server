@@ -138,6 +138,64 @@ Docker Compose publishes the MCP endpoint on loopback at `127.0.0.1:8080`.
 
 The server is model- and client-agnostic. Any MCP client that supports stdio or Streamable HTTP can use the same six tools.
 
+### Public demonstration & remote MCP connection
+
+A public demonstration is available over Streamable HTTP behind Cloudflare at:
+
+```text
+https://demo.vehicle-intelligence.nz/mcp
+```
+
+#### Disclaimers & operational boundaries
+
+- **Synthetic data only:** All vehicles, registrations, and inspection records are deterministic synthetic fixtures. This server does not connect to live or restricted NZ transport registers.
+- **Developer Sandbox tier:** Hosted on Northflank Developer Sandbox compute with Cloudflare edge protection. It is a non-production demonstration environment with no uptime SLA, high availability, or commercial support guarantee.
+- **Edge rate limiting:** Inbound requests are rate-limited to 60 requests per minute per IP to protect sandbox capacity.
+
+#### Remote Codex CLI configuration
+
+Configure the remote MCP server in `~/.codex/config.json`:
+
+```json
+{
+  "mcpServers": {
+    "vehicle-intelligence": {
+      "url": "https://demo.vehicle-intelligence.nz/mcp"
+    }
+  }
+}
+```
+
+#### Remote Claude Desktop configuration
+
+Add the remote Streamable HTTP server to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "vehicle-intelligence-remote": {
+      "url": "https://demo.vehicle-intelligence.nz/mcp"
+    }
+  }
+}
+```
+
+#### Generic Streamable HTTP client
+
+```bash
+curl -X POST https://demo.vehicle-intelligence.nz/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc": "2.0", "method": "tools/list", "id": 1}'
+```
+
+Verify the public endpoint with the verification script:
+
+```bash
+PUBLIC_MCP_URL="https://demo.vehicle-intelligence.nz/mcp" bash scripts/smoke-public.sh
+```
+
+
 ### OpenAI Codex
 
 Register the stdio server with the Codex CLI. Replace `/path/to/vehicle-mcp-server` with the local repository path.
