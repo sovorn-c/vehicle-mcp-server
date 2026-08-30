@@ -40,6 +40,16 @@ def test_documentation_contract() -> None:
     assert "DNS rebinding" in readme or "rebinding" in readme or "loopback" in readme
     assert "synthetic" in readme.lower() or "limitation" in readme.lower()
 
+    # Public demonstration & remote MCP client connection
+    assert "demo.vehicle-intelligence.nz" in readme, "README.md must document public demo URL"
+    assert "codex" in readme.lower(), "README.md must document Codex client setup"
+    assert "rate limit" in readme.lower() or "rate-limit" in readme.lower(), (
+        "README.md must document rate limiting boundaries"
+    )
+    assert "sandbox" in readme.lower() or "no uptime" in readme.lower() or "sla" in readme.lower(), (
+        "README.md must document non-production / no-SLA sandbox notice"
+    )
+
     # Never describe repository as a recruiting artifact or hiring portfolio
     forbidden_meta = [
         "recruiting artifact",
@@ -49,3 +59,4 @@ def test_documentation_contract() -> None:
     ]
     for phrase in forbidden_meta:
         assert phrase not in readme.lower(), f"Forbidden recruiting trope found in README: {phrase}"
+
