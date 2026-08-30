@@ -308,9 +308,102 @@ async def run_demonstration(
     print("==================================================================")
 
 
+async def run_remote_smoke(http_url: str = "http://127.0.0.1:8080/mcp") -> None:
+    """Execute public/remote Streamable HTTP smoke test verifying all six tools and evidence."""
+    print("==================================================================")
+    print(" Vehicle Intelligence MCP Server — Public Smoke Verification")
+    print("==================================================================")
+    print(f"Target URL: {http_url}")
+
+    async with (
+        httpx2.AsyncClient(timeout=10.0) as http_client,
+        streamable_http_client(http_url, http_client=http_client) as (
+            read_stream,
+            write_stream,
+        ),
+        ClientSession(read_stream, write_stream) as http_session,
+    ):
+        await http_session.initialize()
+        http_tools_res = await http_session.list_tools()
+        tool_names = sorted([t.name for t in http_tools_res.tools])
+        assert len(tool_names) == 6, f"Expected 6 tools, got {len(tool_names)}: {tool_names}"
+        print(f"==> Discovered 6 MCP tools over remote Streamable HTTP: {', '.join(tool_names)}")
+
+        # 1. Catalog discovery
+        cat_res = await http_session.call_tool(
+            "list_vehicles", arguments={"limit": 20, "offset": 0}
+        )
+        catalog = _extract_tool_payload(cat_res)
+        assert isinstance(catalog, dict)
+        assert catalog.get("total") == 5, f"Expected 5 vehicles, got {catalog.get('total')}"
+        print(f"==> Catalog discovery passed: {len(catalog.get('items', []))} items verified")
+
+        # 2. Canonical lookup
+        clean_vin = "1HGCR2F85HA000000"
+        lookup_res = await http_session.call_tool(
+            "lookup_vehicle", arguments={"vin": clean_vin}
+        )
+        lookup_data = _extract_tool_payload(lookup_res)
+        assert lookup_data.get("vin") == clean_vin
+        assert lookup_data.get("make") == "HONDA"
+        print(f"==> Canonical lookup passed for {clean_vin}")
+
+        # 3. Field explanation
+        explain_res = await http_session.call_tool(
+            "explain_vehicle_field",
+            arguments={"vin": clean_vin, "field_name": "color"},
+        )
+        explain_data = _extract_tool_payload(explain_res)
+        assert explain_data.get("status") in ("RESOLVED", "UNRESOLVED", "ABSENT")
+        print(f"==> Field explanation passed for {clean_vin}.color")
+
+        # 4. History
+        hist_res = await http_session.call_tool(
+            "get_vehicle_history", arguments={"vin": "7A8B9C0D1E2F3G4H5"}
+        )
+        hist_data = _extract_tool_payload(hist_res)
+        assert isinstance(hist_data, list)
+        assert len(hist_data) >= 2, "Expected at least 2 revisions in history"
+        print(f"==> History retrieval passed: {len(hist_data)} revisions verified")
+
+        # 5. Revision
+        rev_res = await http_session.call_tool(
+            "get_vehicle_revision",
+            arguments={"vin": "7A8B9C0D1E2F3G4H5", "revision_number": 1},
+        )
+        rev_data = _extract_tool_payload(rev_res)
+        assert rev_data.get("revision_number") == 1
+        print("==> Exact revision retrieval passed")
+
+        # 6. Source observation (safe metadata inspection, NEVER printing raw payload)
+        obs_id = "obs-2026-0001"
+        obs_res = await http_session.call_tool(
+            "get_source_observation",
+            arguments={"observation_id": obs_id},
+        )
+        obs_data = _extract_tool_payload(obs_res)
+        assert obs_data.get("observation_id") == obs_id
+        assert "raw_payload" in obs_data
+        source_sys = obs_data.get("source_system")
+        print(f"==> Source observation passed: {obs_id} (source: {source_sys}, payload verified)")
+
+    print("==================================================================")
+    print(" Public smoke verification PASSED! All 6 tools verified.")
+    print("==================================================================")
+
+
 def main() -> None:
     """CLI entrypoint for running the demonstration."""
-    asyncio.run(run_demonstration())
+    import sys
+
+    if "--remote-url" in sys.argv:
+        idx = sys.argv.index("--remote-url")
+        target_url = (
+            sys.argv[idx + 1] if idx + 1 < len(sys.argv) else "http://127.0.0.1:8080/mcp"
+        )
+        asyncio.run(run_remote_smoke(http_url=target_url))
+    else:
+        asyncio.run(run_demonstration())
 
 
 if __name__ == "__main__":
