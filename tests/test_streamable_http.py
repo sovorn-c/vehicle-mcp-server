@@ -158,4 +158,3 @@ def test_streamable_http_rejects_oversized_chunked_request_body() -> None:
             content=chunks(),
         )
         assert resp.status_code == 413
-

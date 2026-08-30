@@ -133,4 +133,3 @@ def test_server_config_rejects_out_of_range_max_request_bytes() -> None:
         ServerConfig(max_request_bytes=1000)
     with pytest.raises(ValidationError):
         ServerConfig(max_request_bytes=20_000_000)
-
