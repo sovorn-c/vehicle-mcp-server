@@ -8,7 +8,9 @@
 
 A canonical value is not enough when the underlying sources disagree. This server gives MCP clients the value, provenance, confidence, conflicts, revision history, and source observations needed to inspect the result.
 
-The server is a typed integration layer over the [NZ Vehicle Data Pipeline](https://github.com/sovorn-c/nz-vehicle-data-pipeline). The pipeline owns vehicle evidence and reconciliation. This project exposes that evidence through six focused MCP tools without duplicating the pipeline's decision logic.
+The server is a typed integration layer over the [NZ Vehicle Data Pipeline](https://github.com/sovorn-c/nz-vehicle-data-pipeline). The upstream pipeline is a deterministic data integration service that captures conflicting vehicle records across disparate sources (VPIC specifications, dealer feeds, fleet data, and risk registers), normalizes them, reconciles competing candidate values with field-level provenance and confidence scoring, and publishes immutable canonical revisions.
+
+This MCP server exposes that evidence through six focused MCP tools without duplicating the pipeline's decision logic or connecting directly to the underlying database.
 
 ## What the server provides
 
@@ -83,6 +85,24 @@ A successful run demonstrates:
 ## Run the server
 
 The upstream pipeline API must be available before the MCP server starts. Its default address is `http://localhost:8000`.
+
+### Start the upstream pipeline (manual testing)
+
+If you are running the MCP server directly or interactively, start and seed the upstream [NZ Vehicle Data Pipeline](https://github.com/sovorn-c/nz-vehicle-data-pipeline) first:
+
+```bash
+cd /path/to/nz-vehicle-data-pipeline
+docker compose up -d --build api
+docker compose --profile tools run --rm seed
+docker compose --profile tools run --rm seed python -m nz_vehicle_data_pipeline.cli.seed --manifest fixtures/manifest.json --phase2
+```
+
+Verify backend readiness:
+
+```bash
+curl -s http://localhost:8000/ready
+# Output: {"status":"ready","database":"connected"}
+```
 
 ### stdio
 
@@ -159,6 +179,18 @@ Add this entry to `claude_desktop_config.json`. Replace `/path/to/vehicle-mcp-se
     }
   }
 }
+```
+
+### MCP Inspector
+
+Test and inspect tool schemas and queries interactively in your browser with the official MCP Inspector:
+
+```bash
+# stdio transport (spawns the server as a subprocess)
+npx @modelcontextprotocol/inspector uv run vehicle-mcp-server
+
+# Streamable HTTP transport (start the HTTP server first)
+npx @modelcontextprotocol/inspector http://127.0.0.1:8080/mcp
 ```
 
 ### Other MCP clients
@@ -258,6 +290,25 @@ bash scripts/check.sh
 ```
 
 The preflight runs Ruff, formatting checks, strict mypy, pytest, a package build, and a Docker build.
+
+### Individual developer checks
+
+| Check | Command |
+|---|---|
+| Test suite (unit, contract, mock integration) | `uv run pytest` |
+| Strict type checking | `uv run mypy src` |
+| Linting | `uv run ruff check .` |
+| Format verification | `uv run ruff format --check .` |
+| Package build | `uv build` |
+| Container build | `docker build -t vehicle-mcp-server:local-check .` |
+
+### Standalone demonstration client
+
+With the upstream pipeline running at `http://localhost:8000` (and optionally the MCP HTTP server on `http://127.0.0.1:8080`):
+
+```bash
+uv run python -m vehicle_mcp_server.demo
+```
 
 Run the cross-repository behavior check:
 
