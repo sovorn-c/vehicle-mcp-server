@@ -328,6 +328,35 @@ async def test_safe_tool_boundary_sanitizes_pipeline_contract_error_logging(
 
 
 @pytest.mark.asyncio
+async def test_safe_tool_boundary_does_not_log_contract_error_text(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Ensure contract diagnostics never reflect arbitrary exception messages."""
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    secret = "SECRET_UNTRUSTED_UPSTREAM_VALUE"
+
+    async def failing_op() -> None:
+        raise PipelineContractError(f"upstream contract detail: {secret}")
+
+    with pytest.raises(ToolError) as exc_info:
+        from vehicle_mcp_server.tools import safe_tool_boundary
+
+        await safe_tool_boundary("lookup_vehicle", failing_op)
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == "[CONTRACT_ERROR] lookup_vehicle: contract response rejected\n"
+    assert secret not in captured.err
+
+    from vehicle_mcp_server.models import SafeError, SafeErrorCategory
+
+    error = SafeError.model_validate_json(str(exc_info.value))
+    assert error.category == SafeErrorCategory.PIPELINE_CONTRACT_ERROR
+    assert error.message == "Upstream pipeline response violated expected contract schema."
+
+
+@pytest.mark.asyncio
 async def test_nested_dict_key_redacted_in_confidence_field_scores(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
