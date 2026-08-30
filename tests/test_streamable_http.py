@@ -60,3 +60,62 @@ def test_streamable_http_dns_rebinding_protection() -> None:
             content='{"jsonrpc": "2.0", "method": "tools/list", "id": 1}',
         )
         assert resp_ok.status_code == 200
+
+
+def test_streamable_http_uses_configured_host_and_origin_policy() -> None:
+    config = ServerConfig(
+        transport="http",
+        allowed_hosts=("preview.vehicle.internal",),
+        allowed_origins=("https://preview.vehicle.internal",),
+    )
+    app = create_streamable_http_app(config)
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        # 1. Native MCP client without Origin on configured Host succeeds
+        resp_native = client.post(
+            "/mcp",
+            headers={
+                "Host": "preview.vehicle.internal",
+                "Content-Type": "application/json",
+                "Accept": "application/json, text/event-stream",
+            },
+            content='{"jsonrpc": "2.0", "method": "tools/list", "id": 1}',
+        )
+        assert resp_native.status_code == 200
+
+        # 2. Approved HTTPS Origin on configured Host succeeds
+        resp_browser = client.post(
+            "/mcp",
+            headers={
+                "Host": "preview.vehicle.internal",
+                "Origin": "https://preview.vehicle.internal",
+                "Content-Type": "application/json",
+                "Accept": "application/json, text/event-stream",
+            },
+            content='{"jsonrpc": "2.0", "method": "tools/list", "id": 2}',
+        )
+        assert resp_browser.status_code == 200
+
+        # 3. Disallowed Origin on configured Host is rejected
+        resp_bad_origin = client.post(
+            "/mcp",
+            headers={
+                "Host": "preview.vehicle.internal",
+                "Origin": "https://evil.example.com",
+                "Content-Type": "application/json",
+            },
+            content="{}",
+        )
+        assert resp_bad_origin.status_code in (400, 403)
+
+        # 4. Replaced default loopback Host is rejected
+        resp_loopback = client.post(
+            "/mcp",
+            headers={
+                "Host": "127.0.0.1",
+                "Content-Type": "application/json",
+            },
+            content="{}",
+        )
+        assert resp_loopback.status_code in (400, 403, 421)
+
