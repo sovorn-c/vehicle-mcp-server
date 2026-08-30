@@ -22,8 +22,8 @@ The demonstration runs on the **Northflank Developer Sandbox** behind **Cloudfla
    - Explicit approval for Northflank identity payment verification.
    - Cloudflare-managed domain assignment (`vehicle-intelligence.nz`).
 2. **Pinned Commit References:**
-   - Pipeline Ref: `21024499ec71bc09b33b136de9ca369ca052685b`
-   - MCP Server Ref: `main` (or reviewed release tag `v0.2.0`)
+   - Pipeline Ref: `ea49e71075118d6cdc3ed2426cb3620f69792cf6`
+   - MCP Server Ref: `main` (or reviewed release tag `v0.3.0`)
 
 ---
 

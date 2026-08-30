@@ -65,7 +65,7 @@ mkdir vehicle-intelligence-demo
 cd vehicle-intelligence-demo
 
 git clone https://github.com/sovorn-c/nz-vehicle-data-pipeline.git
-git -C nz-vehicle-data-pipeline checkout 21024499ec71bc09b33b136de9ca369ca052685b
+git -C nz-vehicle-data-pipeline checkout ea49e71075118d6cdc3ed2426cb3620f69792cf6
 
 git clone https://github.com/sovorn-c/vehicle-mcp-server.git
 cd vehicle-mcp-server
@@ -140,11 +140,13 @@ The server is model- and client-agnostic. Any MCP client that supports stdio or 
 
 ### Public demonstration & remote MCP connection
 
-A public demonstration is available over Streamable HTTP behind Cloudflare at:
+The repository provides infrastructure-as-code and edge configurations to deploy a public demonstration over Streamable HTTP behind Cloudflare at:
 
 ```text
 https://demo.vehicle-intelligence.nz/mcp
 ```
+
+> **Deployment Notice:** Public demonstration infrastructure is defined in [`deploy/northflank.template.json`](deploy/northflank.template.json) and [`deploy/cloudflare-edge.json`](deploy/cloudflare-edge.json). Provisioning and operations are documented in the [Public Demo Runbook](docs/runbooks/public-demo.md). When evaluating locally, use `http://127.0.0.1:8080/mcp`.
 
 #### Disclaimers & operational boundaries
 
@@ -378,4 +380,4 @@ The CI workflow repeats the preflight stages and runs the smoke check against th
 
 ## Project status
 
-Release `0.2.0` provides six read-only tools over stdio and Streamable HTTP. The current release targets local and private integrations with deterministic demonstration data.
+Release `0.3.0` provides six read-only tools over stdio and Streamable HTTP with hardened public deployment and edge rate-limiting contracts.
