@@ -119,6 +119,17 @@ def test_streamable_http_uses_configured_host_and_origin_policy() -> None:
         )
         assert resp_loopback.status_code in (400, 403, 421)
 
+        # 5. Direct-origin bypass attempt via generated cloud domain is rejected
+        resp_direct_origin = client.post(
+            "/mcp",
+            headers={
+                "Host": "vehicle-mcp-server.sandbox.northflank.app",
+                "Content-Type": "application/json",
+            },
+            content="{}",
+        )
+        assert resp_direct_origin.status_code in (400, 403, 421)
+
 
 def test_streamable_http_rejects_oversized_declared_content_length() -> None:
     config = ServerConfig(transport="http", max_request_bytes=20_000)

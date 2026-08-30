@@ -93,11 +93,23 @@ if [[ "${MODE}" == "security" ]]; then
             exit 1
         fi
         echo "    ✓ Oversized request body rejected (HTTP ${OVERSIZED_CODE})"
+
+        # 4. Direct-origin bypass attempt using generated cloud domain
+        DIRECT_ORIGIN_CODE=$(curl -s -S --connect-timeout 5 --max-time 10 -o /dev/null -w "%{http_code}" \
+            -X POST "${PUBLIC_MCP_URL}" \
+            -H "Host: vehicle-mcp-server.sandbox.northflank.app" \
+            -H "Content-Type: application/json" \
+            -d '{"jsonrpc":"2.0","method":"tools/list","id":1}' 2>&1 || true)
+        if [[ "${DIRECT_ORIGIN_CODE}" != "400" && "${DIRECT_ORIGIN_CODE}" != "403" && "${DIRECT_ORIGIN_CODE}" != "421" ]]; then
+            echo "ERROR: Expected 400, 403, or 421 for direct-origin bypass attempt, got: ${DIRECT_ORIGIN_CODE}"
+            exit 1
+        fi
+        echo "    ✓ Direct-origin bypass attempt rejected (HTTP ${DIRECT_ORIGIN_CODE})"
     else
         # Local loopback security verification
         (
             cd "${ROOT_DIR}"
-            uv run pytest tests/test_streamable_http.py -k "dns_rebinding or configured_host or oversized" -q
+            uv run pytest tests/test_streamable_http.py -k "dns_rebinding or configured_host_and_origin or oversized" -q
         )
     fi
     echo "==> All security negative probes PASSED successfully! No sensitive disclosures."
@@ -121,8 +133,9 @@ if [[ "${MODE}" == "rate-limit" ]]; then
             fi
         done
         if [[ "${ENCOUNTERED_429}" != "true" ]]; then
-            echo "WARNING: Rate limit 429 not encountered in 65 requests. Checking edge contract specification..."
-            uv run pytest tests/acceptance/test_edge_contract.py -k "rate_limiting" -q
+            echo "ERROR: Rate limit was not observed. Received no HTTP 429 responses after 65 rapid requests against ${PUBLIC_MCP_URL}."
+            echo "Edge rate limiting is either inactive or threshold is set incorrectly."
+            exit 1
         fi
     else
         (

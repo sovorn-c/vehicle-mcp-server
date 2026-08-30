@@ -23,7 +23,7 @@ The demonstration runs on the **Northflank Developer Sandbox** behind **Cloudfla
    - Cloudflare-managed domain assignment (`vehicle-intelligence.nz`).
 2. **Pinned Commit References:**
    - Pipeline Ref: `ea49e71075118d6cdc3ed2426cb3620f69792cf6`
-   - MCP Server Ref: `main` (or reviewed release tag `v0.3.0`)
+   - MCP Server Ref: Immutable release tag `v0.3.0` or exact reviewed commit SHA (never mutable branch `main`)
 
 ---
 
