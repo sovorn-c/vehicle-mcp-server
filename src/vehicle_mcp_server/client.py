@@ -47,19 +47,33 @@ class PipelineUnavailableError(PipelineError):
     """Raised when the pipeline service cannot be reached or returns a 5xx gateway error."""
 
 
+def format_contract_validation_diagnostic(exc: ValidationError) -> str:
+    """Format Pydantic ValidationError into sanitized, fixed-format diagnostics.
+
+    Guarantees no raw input values, payload fragments, or PII leak to logs (CWE-532).
+    """
+    items: list[str] = []
+    for err in exc.errors():
+        field_path = ".".join(str(x) for x in err.get("loc", [])) or "root"
+        err_type = err.get("type", "contract_violation")
+        items.append(f"field='{field_path}' error='{err_type}'")
+    return ", ".join(items)
+
+
 class VehiclePipelineClient:
     """Async client performing typed, timed reads against the pipeline HTTP API."""
 
     def __init__(
         self,
         config: ServerConfig,
-        http_client: httpx2.AsyncClient,
-        sleep_func: Callable[[float], Awaitable[None]] = asyncio.sleep,
+        http_client: httpx2.AsyncClient | None = None,
+        sleep_func: Callable[[float], Awaitable[None]] | None = None,
+        sleep_fn: Callable[[float], Awaitable[None]] | None = None,
     ) -> None:
         self._config = config
-        self._http_client = http_client
-        self._sleep = sleep_func
         self._base_url = str(config.pipeline_base_url).rstrip("/")
+        self._http_client = http_client or httpx2.AsyncClient()
+        self._sleep = sleep_func or sleep_fn or asyncio.sleep
 
     async def _request_with_retry(
         self,
@@ -147,9 +161,8 @@ class VehiclePipelineClient:
                     if retry_after:
                         try:
                             parsed = float(retry_after)
-                            if 0 < parsed <= 2.0:
-                                delay = parsed
-                        except ValueError:
+                            delay = max(0.0, min(parsed, 5.0))
+                        except (ValueError, TypeError):
                             pass
                     await self._sleep(delay)
                     continue
@@ -159,7 +172,7 @@ class VehiclePipelineClient:
 
         if last_error:
             raise last_error
-        raise PipelineUnavailableError("Max request attempts exhausted.")
+        raise PipelineUnavailableError(f"Request failed after {self._config.max_attempts} attempts")
 
     async def list_vehicles(
         self,
@@ -188,7 +201,11 @@ class VehiclePipelineClient:
             try:
                 return VehicleCatalogPage.model_validate(data)
             except ValidationError as exc:
-                print(f"[CONTRACT_ERROR] {url} catalog validation failed: {exc}", file=sys.stderr)
+                diagnostic = format_contract_validation_diagnostic(exc)
+                print(
+                    f"[CONTRACT_ERROR] {url} catalog validation failed: {diagnostic}",
+                    file=sys.stderr,
+                )
                 raise PipelineContractError(
                     "Pipeline catalog page violates VehicleCatalogPage contract."
                 ) from exc
@@ -219,8 +236,9 @@ class VehiclePipelineClient:
             try:
                 return VehicleRevisionResponse.model_validate(data)
             except ValidationError as exc:
+                diagnostic = format_contract_validation_diagnostic(exc)
                 print(
-                    f"[CONTRACT_ERROR] {url} vehicle revision validation failed: {exc}",
+                    f"[CONTRACT_ERROR] {url} vehicle revision validation failed: {diagnostic}",
                     file=sys.stderr,
                 )
                 raise PipelineContractError(
@@ -269,8 +287,9 @@ class VehiclePipelineClient:
             try:
                 return [VehicleRevisionResponse.model_validate(item) for item in data]
             except ValidationError as exc:
+                diagnostic = format_contract_validation_diagnostic(exc)
                 print(
-                    f"[CONTRACT_ERROR] {url} history item validation failed: {exc}",
+                    f"[CONTRACT_ERROR] {url} history item validation failed: {diagnostic}",
                     file=sys.stderr,
                 )
                 raise PipelineContractError(
@@ -308,7 +327,11 @@ class VehiclePipelineClient:
             try:
                 return VehicleRevisionResponse.model_validate(data)
             except ValidationError as exc:
-                print(f"[CONTRACT_ERROR] {url} revision validation failed: {exc}", file=sys.stderr)
+                diagnostic = format_contract_validation_diagnostic(exc)
+                print(
+                    f"[CONTRACT_ERROR] {url} revision validation failed: {diagnostic}",
+                    file=sys.stderr,
+                )
                 raise PipelineContractError(
                     "Pipeline revision violates VehicleRevisionResponse contract."
                 ) from exc
@@ -347,8 +370,9 @@ class VehiclePipelineClient:
             try:
                 obs = SourceObservationResponse.model_validate(data)
             except ValidationError as exc:
+                diagnostic = format_contract_validation_diagnostic(exc)
                 print(
-                    f"[CONTRACT_ERROR] {url} observation validation failed: {exc}",
+                    f"[CONTRACT_ERROR] {url} observation validation failed: {diagnostic}",
                     file=sys.stderr,
                 )
                 raise PipelineContractError(
