@@ -7,13 +7,6 @@
       "content": "vehicle-mcp-server.sandbox.northflank.app",
       "proxied": true,
       "comment": "Public MCP Streamable HTTP endpoint"
-    },
-    {
-      "type": "CNAME",
-      "name": "api.vehicle-intelligence.nz",
-      "content": "vehicle-pipeline.sandbox.northflank.app",
-      "proxied": true,
-      "comment": "Optional read-only pipeline API and OpenAPI docs"
     }
   ],
   "tls": {
@@ -28,21 +21,6 @@
     {
       "description": "Bypass cache for dynamic MCP protocol endpoint",
       "path": "/mcp*",
-      "action": "bypass"
-    },
-    {
-      "description": "Bypass cache for pipeline API routes",
-      "path": "/v1/*",
-      "action": "bypass"
-    },
-    {
-      "description": "Bypass cache for OpenAPI documentation",
-      "path": "/openapi.json",
-      "action": "bypass"
-    },
-    {
-      "description": "Bypass cache for interactive Swagger docs",
-      "path": "/docs*",
       "action": "bypass"
     }
   ],
