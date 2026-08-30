@@ -36,12 +36,6 @@ from vehicle_mcp_server.models import (
 )
 
 
-def sanitize_log_message(text: str, max_length: int = 160) -> str:
-    """Sanitize message for stderr logging by stripping control characters and bounding length."""
-    clean = "".join(c if 32 <= ord(c) <= 126 else "_" for c in text)
-    return clean[:max_length]
-
-
 async def safe_tool_boundary[T](
     tool_name: str,
     operation: Callable[[], Awaitable[T]],
@@ -107,7 +101,7 @@ async def safe_tool_boundary[T](
             ).model_dump_json()
         ) from exc
     except PipelineContractError as exc:
-        print(f"[CONTRACT_ERROR] {tool_name}: {sanitize_log_message(str(exc))}", file=sys.stderr)
+        print(f"[CONTRACT_ERROR] {tool_name}: contract response rejected", file=sys.stderr)
         raise ToolError(
             SafeError(
                 category=SafeErrorCategory.PIPELINE_CONTRACT_ERROR,

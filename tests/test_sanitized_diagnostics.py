@@ -297,34 +297,31 @@ async def test_list_vehicles_redacts_extra_forbidden_key_name(
 
 
 @pytest.mark.asyncio
-async def test_safe_tool_boundary_sanitizes_pipeline_contract_error_logging(
+async def test_safe_tool_boundary_does_not_log_contract_error_text(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
+    """Ensure contract diagnostics never reflect arbitrary exception messages."""
     from mcp.server.mcpserver.exceptions import ToolError
 
-    from vehicle_mcp_server.tools import safe_tool_boundary, sanitize_log_message
+    from vehicle_mcp_server.models import SafeError, SafeErrorCategory
+    from vehicle_mcp_server.tools import safe_tool_boundary
 
-    # Test sanitize_log_message directly
-    raw_text = "Message with\r\nCRLF and \x00null and " + "A" * 300
-    cleaned = sanitize_log_message(raw_text, max_length=100)
-    assert "\r" not in cleaned
-    assert "\n" not in cleaned
-    assert "\x00" not in cleaned
-    assert len(cleaned) <= 100
+    secret = "SECRET_UNTRUSTED_UPSTREAM_VALUE"
 
-    # Test safe_tool_boundary logging of PipelineContractError
     async def failing_op() -> None:
-        raise PipelineContractError("Contract failed with\r\nmalicious header\x1b[31m")
+        raise PipelineContractError(f"upstream contract detail: {secret}")
 
-    with pytest.raises(ToolError):
+    with pytest.raises(ToolError) as exc_info:
         await safe_tool_boundary("lookup_vehicle", failing_op)
 
     captured = capsys.readouterr()
     assert captured.out == ""
-    assert "[CONTRACT_ERROR] lookup_vehicle:" in captured.err
-    assert "\r" not in captured.err
-    assert "\n" not in captured.err[:-1]  # Only the trailing newline from print
-    assert "\x1b" not in captured.err
+    assert captured.err == "[CONTRACT_ERROR] lookup_vehicle: contract response rejected\n"
+    assert secret not in captured.err
+
+    error = SafeError.model_validate_json(str(exc_info.value))
+    assert error.category == SafeErrorCategory.PIPELINE_CONTRACT_ERROR
+    assert error.message == "Upstream pipeline response violated expected contract schema."
 
 
 @pytest.mark.asyncio
