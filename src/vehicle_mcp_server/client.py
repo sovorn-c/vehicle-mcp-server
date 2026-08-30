@@ -121,7 +121,7 @@ def format_contract_validation_diagnostic(exc: ValidationError) -> str:
         sanitized_loc_tokens: list[str] = []
         loc_tuple = err.get("loc", ())
         for token in loc_tuple:
-            if isinstance(token, int) or (isinstance(token, str) and token.isdigit()):
+            if isinstance(token, int) and not isinstance(token, bool):
                 sanitized_loc_tokens.append(str(token))
             elif isinstance(token, str) and token in ALLOWED_FIELD_NAMES:
                 sanitized_loc_tokens.append(token)

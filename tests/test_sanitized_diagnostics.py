@@ -399,3 +399,55 @@ def test_format_contract_validation_diagnostic_bounds_error_count() -> None:
     assert "... (2 more contract errors)" in diagnostic
     # Verify exactly 5 errors reported before truncation
     assert diagnostic.count("error=") == 5
+
+
+@pytest.mark.asyncio
+async def test_numeric_string_dict_key_is_redacted(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Ensure numeric string keys in dynamic dictionaries are redacted to <key>."""
+    numeric_secret_key = "9876543210"
+    malformed_payload = _make_valid_revision_dict()
+    assert isinstance(malformed_payload["confidence"], dict)
+    malformed_payload["confidence"]["field_scores"] = {numeric_secret_key: "not_an_int"}
+
+    transport = httpx2.MockTransport(lambda _: httpx2.Response(200, json=malformed_payload))
+    async with httpx2.AsyncClient(transport=transport) as http_client:
+        client = VehiclePipelineClient(_make_config(), http_client)
+        with pytest.raises(
+            PipelineContractError,
+            match="Pipeline response violates VehicleRevisionResponse contract.",
+        ):
+            await client.get_current_vehicle("1HGCR2F85HA000000")
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "[CONTRACT_ERROR]" in captured.err
+    assert "field='confidence.field_scores.<key>' error='int_parsing'" in captured.err
+    assert numeric_secret_key not in captured.err
+
+
+@pytest.mark.asyncio
+async def test_nested_dict_key_redacted_in_field_provenance(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Ensure arbitrary keys in field_provenance are redacted to <key>."""
+    secret_provenance_key = "SECRET_PROVENANCE_CANARY_KEY"
+    malformed_payload = _make_valid_revision_dict()
+    malformed_payload["field_provenance"] = {secret_provenance_key: [{"invalid": "item"}]}
+
+    transport = httpx2.MockTransport(lambda _: httpx2.Response(200, json=malformed_payload))
+    async with httpx2.AsyncClient(transport=transport) as http_client:
+        client = VehiclePipelineClient(_make_config(), http_client)
+        with pytest.raises(
+            PipelineContractError,
+            match="Pipeline response violates VehicleRevisionResponse contract.",
+        ):
+            await client.get_current_vehicle("1HGCR2F85HA000000")
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "[CONTRACT_ERROR]" in captured.err
+    assert "field='field_provenance.<key>.0.observation_id' error='missing'" in captured.err
+    assert secret_provenance_key not in captured.err
+    assert "<extra_field>" in captured.err
