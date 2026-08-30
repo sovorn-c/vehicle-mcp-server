@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import re
 import sys
 from collections.abc import Awaitable, Callable
 from urllib.parse import quote
@@ -47,15 +48,85 @@ class PipelineUnavailableError(PipelineError):
     """Raised when the pipeline service cannot be reached or returns a 5xx gateway error."""
 
 
+ALLOWED_FIELD_NAMES: frozenset[str] = frozenset(
+    {
+        # VehicleCatalogPage & VehicleSummary
+        "items",
+        "total",
+        "limit",
+        "offset",
+        "disclaimer",
+        "vin",
+        "make",
+        "model",
+        "year",
+        "registration_status",
+        "confidence_score",
+        "has_conflicts",
+        "revision_number",
+        "synthetic",
+        # VehicleRevisionResponse & components
+        "revision_id",
+        "material_hash",
+        "canonical_fields",
+        "field_provenance",
+        "conflicts",
+        "confidence",
+        "as_of",
+        "published_at",
+        "synthetic_notice",
+        "score",
+        "band",
+        "field_scores",
+        "field_components",
+        "rule_version",
+        "explanation",
+        "field_name",
+        "conflicting_candidates",
+        "state",
+        "winning_value",
+        "rationale",
+        "value",
+        "provenance",
+        "observation_id",
+        "source_system",
+        "source_record_id",
+        "retrieved_at",
+        # SourceObservationResponse
+        "ingestion_run_id",
+        "raw_payload",
+        "payload_hash_sha256",
+    }
+)
+
+
 def format_contract_validation_diagnostic(exc: ValidationError) -> str:
     """Format Pydantic ValidationError into sanitized, fixed-format diagnostics.
 
-    Guarantees no raw input values, payload fragments, or PII leak to logs (CWE-532).
+    Guarantees no raw input values, payload fragments, PII, or attacker-controlled
+    keys/control characters leak to logs (CWE-532, CWE-117).
     """
     items: list[str] = []
     for err in exc.errors():
-        field_path = ".".join(str(x) for x in err.get("loc", [])) or "root"
-        err_type = err.get("type", "contract_violation")
+        err_type_raw = str(err.get("type", "contract_violation"))
+        err_type = re.sub(r"[^a-zA-Z0-9_]", "_", err_type_raw)[:48]
+
+        sanitized_loc_tokens: list[str] = []
+        loc_tuple = err.get("loc", ())
+        for token in loc_tuple:
+            if isinstance(token, int) or (isinstance(token, str) and token.isdigit()):
+                sanitized_loc_tokens.append(str(token))
+            elif isinstance(token, str) and token in ALLOWED_FIELD_NAMES:
+                sanitized_loc_tokens.append(token)
+            elif err_type == "extra_forbidden":
+                # For unexpected extra fields, redact attacker-controlled key name
+                sanitized_loc_tokens.append("<extra_field>")
+            else:
+                # Sanitize unexpected token against control characters
+                clean = re.sub(r"[^a-zA-Z0-9_.-]", "_", str(token))[:32]
+                sanitized_loc_tokens.append(clean or "<unrecognized_field>")
+
+        field_path = ".".join(sanitized_loc_tokens) or "root"
         items.append(f"field='{field_path}' error='{err_type}'")
     return ", ".join(items)
 
@@ -383,8 +454,7 @@ class VehiclePipelineClient:
             expected_hash = obs.payload_hash_sha256.lower().removeprefix("sha256:")
             if computed_hash != expected_hash:
                 raise PipelineContractError(
-                    f"Payload SHA-256 mismatch for observation '{observation_id}': "
-                    f"computed {computed_hash} != {expected_hash}"
+                    f"Payload SHA-256 mismatch for observation '{observation_id}'"
                 )
 
             return obs

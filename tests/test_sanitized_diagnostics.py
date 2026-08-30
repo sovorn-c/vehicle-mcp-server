@@ -218,3 +218,110 @@ async def test_get_source_observation_sanitizes_contract_diagnostics(
     assert "field='synthetic' error='bool_parsing'" in captured.err
     assert secret_token not in captured.err
     assert "input_value" not in captured.err
+
+
+def test_format_contract_validation_diagnostic_redacts_extra_forbidden_key_name() -> None:
+    """Ensure attacker-controlled extra field names never reach diagnostic logs."""
+    secret_key = "SECRET_KEY_NAME_SHOULD_NOT_REACH_LOG"
+
+    class StrictModel(BaseModel):
+        allowed_field: str
+        model_config = {"extra": "forbid"}
+
+    with pytest.raises(ValidationError) as exc_info:
+        StrictModel.model_validate({"allowed_field": "valid", secret_key: "value"})
+
+    diagnostic = format_contract_validation_diagnostic(exc_info.value)
+    assert secret_key not in diagnostic
+    assert "field='<extra_field>' error='extra_forbidden'" in diagnostic
+
+
+def test_format_contract_validation_diagnostic_escapes_control_characters() -> None:
+    """Ensure control characters in field paths are stripped or escaped (CWE-117)."""
+    malicious_key = "INJECTED_\r\n_LOG_CRLF\x00_ATTACK"
+
+    class StrictModel(BaseModel):
+        allowed_field: str
+        model_config = {"extra": "forbid"}
+
+    with pytest.raises(ValidationError) as exc_info:
+        StrictModel.model_validate({"allowed_field": "valid", malicious_key: "value"})
+
+    diagnostic = format_contract_validation_diagnostic(exc_info.value)
+    assert "\r" not in diagnostic
+    assert "\n" not in diagnostic
+    assert "\x00" not in diagnostic
+    assert "field='<extra_field>' error='extra_forbidden'" in diagnostic
+
+
+@pytest.mark.asyncio
+async def test_list_vehicles_redacts_extra_forbidden_key_name(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    secret_key = "SECRET_KEY_NAME_SHOULD_NOT_REACH_LOG"
+    malformed_payload = {
+        "items": [
+            {
+                "vin": "1HGCR2F85HA000000",
+                "make": "HONDA",
+                "model": "ACCORD",
+                "year": 2017,
+                "registration_status": "CURRENT",
+                "confidence_score": 0.85,
+                "has_conflicts": False,
+                "revision_number": 1,
+                "synthetic": False,
+                secret_key: "attacker_payload",
+            }
+        ],
+        "total": 1,
+        "limit": 20,
+        "offset": 0,
+        "disclaimer": "Notice",
+    }
+
+    transport = httpx2.MockTransport(lambda _: httpx2.Response(200, json=malformed_payload))
+    async with httpx2.AsyncClient(transport=transport) as http_client:
+        client = VehiclePipelineClient(_make_config(), http_client)
+        with pytest.raises(
+            PipelineContractError,
+            match="Pipeline catalog page violates VehicleCatalogPage contract.",
+        ):
+            await client.list_vehicles()
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "[CONTRACT_ERROR]" in captured.err
+    assert "field='items.0.<extra_field>' error='extra_forbidden'" in captured.err
+    assert secret_key not in captured.err
+
+
+@pytest.mark.asyncio
+async def test_safe_tool_boundary_sanitizes_pipeline_contract_error_logging(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    from vehicle_mcp_server.tools import safe_tool_boundary, sanitize_log_message
+
+    # Test sanitize_log_message directly
+    raw_text = "Message with\r\nCRLF and \x00null and " + "A" * 300
+    cleaned = sanitize_log_message(raw_text, max_length=100)
+    assert "\r" not in cleaned
+    assert "\n" not in cleaned
+    assert "\x00" not in cleaned
+    assert len(cleaned) <= 100
+
+    # Test safe_tool_boundary logging of PipelineContractError
+    async def failing_op() -> None:
+        raise PipelineContractError("Contract failed with\r\nmalicious header\x1b[31m")
+
+    with pytest.raises(ToolError):
+        await safe_tool_boundary("lookup_vehicle", failing_op)
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "[CONTRACT_ERROR] lookup_vehicle:" in captured.err
+    assert "\r" not in captured.err
+    assert "\n" not in captured.err[:-1]  # Only the trailing newline from print
+    assert "\x1b" not in captured.err
