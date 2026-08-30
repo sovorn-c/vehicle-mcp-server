@@ -30,7 +30,9 @@ def test_edge_contract_tls_and_security_ruleset() -> None:
 
     # Strict TLS
     tls = data.get("tls", {})
-    assert tls.get("mode") in ("strict", "full_strict"), "Edge TLS must use strict origin validation"
+    assert tls.get("mode") in ("strict", "full_strict"), (
+        "Edge TLS must use strict origin validation"
+    )
 
     # WAF ruleset
     waf = data.get("waf", {})
@@ -62,5 +64,7 @@ def test_edge_contract_one_free_rate_limiting_rule() -> None:
     )
     assert rule.get("requests_per_period") == 60, "Rate limit threshold must be 60 requests"
     assert rule.get("period_seconds") == 60, "Rate limit period must be 60 seconds"
-    assert rule.get("action") in ("block", "challenge", "429"), "Rate limit action must reject traffic"
+    assert rule.get("action") in ("block", "challenge", "429"), (
+        "Rate limit action must reject traffic"
+    )
     assert "/mcp" in rule.get("path", ""), "Rate limit rule must cover /mcp path"

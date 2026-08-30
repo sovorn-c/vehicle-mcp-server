@@ -1,0 +1,62 @@
+{
+  "zone": "vehicle-intelligence.nz",
+  "dns_records": [
+    {
+      "type": "CNAME",
+      "name": "demo.vehicle-intelligence.nz",
+      "content": "vehicle-mcp-server.sandbox.northflank.app",
+      "proxied": true,
+      "comment": "Public MCP Streamable HTTP endpoint"
+    },
+    {
+      "type": "CNAME",
+      "name": "api.vehicle-intelligence.nz",
+      "content": "vehicle-pipeline.sandbox.northflank.app",
+      "proxied": true,
+      "comment": "Optional read-only pipeline API and OpenAPI docs"
+    }
+  ],
+  "tls": {
+    "mode": "strict",
+    "min_tls_version": "1.2",
+    "automatic_https_rewrites": true
+  },
+  "waf": {
+    "free_managed_ruleset": true
+  },
+  "cache_rules": [
+    {
+      "description": "Bypass cache for dynamic MCP protocol endpoint",
+      "path": "/mcp*",
+      "action": "bypass"
+    },
+    {
+      "description": "Bypass cache for pipeline API routes",
+      "path": "/v1/*",
+      "action": "bypass"
+    },
+    {
+      "description": "Bypass cache for OpenAPI documentation",
+      "path": "/openapi.json",
+      "action": "bypass"
+    },
+    {
+      "description": "Bypass cache for interactive Swagger docs",
+      "path": "/docs*",
+      "action": "bypass"
+    }
+  ],
+  "rate_limiting_rules": [
+    {
+      "description": "Rate limit /mcp to 60 requests per minute per IP",
+      "path": "/mcp*",
+      "counting": "ip",
+      "characteristics": [
+        "ip"
+      ],
+      "requests_per_period": 60,
+      "period_seconds": 60,
+      "action": "block"
+    }
+  ]
+}
