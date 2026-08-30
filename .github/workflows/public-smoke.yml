@@ -1,0 +1,43 @@
+name: Public Demo Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: "Public MCP Server URL to smoke test"
+        required: false
+        default: "https://demo.vehicle-intelligence.nz/mcp"
+  schedule:
+    - cron: "0 6 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Public MCP Smoke Verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --frozen || uv sync
+
+      - name: Run public smoke verification
+        env:
+          PUBLIC_MCP_URL: ${{ inputs.target_url || 'https://demo.vehicle-intelligence.nz/mcp' }}
+        run: |
+          bash scripts/smoke-public.sh

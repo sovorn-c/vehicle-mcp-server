@@ -22,7 +22,9 @@ def test_github_actions_public_smoke_workflow() -> None:
     content = workflow_path.read_text()
     assert "workflow_dispatch:" in content, "public-smoke.yml must support manual trigger"
     assert "schedule:" in content, "public-smoke.yml must support scheduled trigger"
-    assert "contents: read" in content, "public-smoke.yml must enforce least-privilege contents: read"
+    assert "contents: read" in content, (
+        "public-smoke.yml must enforce least-privilege contents: read"
+    )
     assert "smoke-public.sh" in content, "public-smoke.yml must execute scripts/smoke-public.sh"
 
     # Secret isolation
@@ -39,5 +41,6 @@ def test_public_demo_runbook_contract() -> None:
     assert "Emergency Disable" in content or "emergency disable" in content.lower()
     assert "Deterministic Rebuild" in content or "rebuild" in content.lower()
     assert "Billing Review" in content or "billing" in content.lower()
-    assert "Migration" in content and "Seed" in content
+    assert "Migration" in content
+    assert "Seed" in content
     assert "Developer Sandbox" in content or "non-production" in content.lower()
