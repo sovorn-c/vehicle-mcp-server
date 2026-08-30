@@ -21,7 +21,9 @@ def test_northflank_template_resource_counts_and_sandbox_fit() -> None:
     addons = data.get("addons", data.get("spec", {}).get("addons", []))
 
     # Exactly 2 services: pipeline API and MCP server
-    assert len(services) == 2, f"Expected exactly 2 services in Developer Sandbox, got {len(services)}"
+    assert len(services) == 2, (
+        f"Expected exactly 2 services in Developer Sandbox, got {len(services)}"
+    )
     service_names = [s.get("name") for s in services]
     assert any("pipeline" in name for name in service_names if name)
     assert any("mcp" in name for name in service_names if name)
@@ -81,7 +83,9 @@ def test_northflank_template_contains_no_secrets() -> None:
         "postgres://user:pass",
     ]
     for token in forbidden_tokens:
-        assert token not in raw_text.lower(), f"Template must not contain hardcoded credentials: {token}"
+        assert token not in raw_text.lower(), (
+            f"Template must not contain hardcoded credentials: {token}"
+        )
 
 
 def test_northflank_template_health_checks_and_free_plans() -> None:
@@ -90,11 +94,13 @@ def test_northflank_template_health_checks_and_free_plans() -> None:
 
     services = data.get("services", data.get("spec", {}).get("services", []))
     for s in services:
-        assert "healthCheck" in s or "health" in s, f"Service {s.get('name')} must configure health check"
-        plan = s.get("plan", s.get("billing", {}).get("plan", ""))
-        assert "free" in plan.lower() or "sandbox" in plan.lower() or "nf-compute-10" in plan.lower(), (
-            f"Service {s.get('name')} must use free-tier plan, got {plan}"
+        assert "healthCheck" in s or "health" in s, (
+            f"Service {s.get('name')} must configure health check"
         )
+        plan = s.get("plan", s.get("billing", {}).get("plan", ""))
+        assert (
+            "free" in plan.lower() or "sandbox" in plan.lower() or "nf-compute-10" in plan.lower()
+        ), f"Service {s.get('name')} must use free-tier plan, got {plan}"
 
     addons = data.get("addons", data.get("spec", {}).get("addons", []))
     for a in addons:

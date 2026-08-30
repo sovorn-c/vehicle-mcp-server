@@ -1,0 +1,127 @@
+{
+  "apiVersion": "v1",
+  "kind": "Project",
+  "name": "vehicle-intelligence-demo",
+  "description": "Audited NZ Vehicle Intelligence MCP demonstration running on Northflank Developer Sandbox",
+  "parameters": {
+    "PIPELINE_REF": {
+      "type": "string",
+      "description": "Git commit SHA for sovorn-c/nz-vehicle-data-pipeline",
+      "default": "21024499ec71bc09b33b136de9ca369ca052685b"
+    },
+    "MCP_REF": {
+      "type": "string",
+      "description": "Git commit SHA or branch for sovorn-c/vehicle-mcp-server",
+      "default": "main"
+    },
+    "MCP_ALLOWED_HOSTS": {
+      "type": "string",
+      "description": "Approved public hostname for MCP server",
+      "default": "demo.vehicle-intelligence.nz"
+    }
+  },
+  "addons": [
+    {
+      "name": "postgres-db",
+      "type": "postgresql",
+      "plan": "nf-addon-free",
+      "publicAccess": false,
+      "version": "16",
+      "storage": {
+        "size": "1GB"
+      }
+    }
+  ],
+  "jobs": [
+    {
+      "name": "db-migrate",
+      "type": "job",
+      "plan": "nf-compute-10",
+      "build": {
+        "repository": "https://github.com/sovorn-c/nz-vehicle-data-pipeline",
+        "branch": "${PIPELINE_REF}",
+        "dockerfilePath": "Dockerfile"
+      },
+      "run": {
+        "command": "uv run alembic upgrade head"
+      },
+      "environment": {
+        "DATABASE_URL": "${POSTGRES_DB_CONNECTION_STRING}"
+      }
+    },
+    {
+      "name": "db-seed",
+      "type": "job",
+      "plan": "nf-compute-10",
+      "build": {
+        "repository": "https://github.com/sovorn-c/nz-vehicle-data-pipeline",
+        "branch": "${PIPELINE_REF}",
+        "dockerfilePath": "Dockerfile"
+      },
+      "run": {
+        "command": "python -m nz_vehicle_data_pipeline.cli.seed --manifest fixtures/manifest.json --phase2"
+      },
+      "environment": {
+        "DATABASE_URL": "${POSTGRES_DB_CONNECTION_STRING}"
+      }
+    }
+  ],
+  "services": [
+    {
+      "name": "vehicle-pipeline",
+      "plan": "nf-compute-10",
+      "build": {
+        "repository": "https://github.com/sovorn-c/nz-vehicle-data-pipeline",
+        "branch": "${PIPELINE_REF}",
+        "dockerfilePath": "Dockerfile"
+      },
+      "ports": [
+        {
+          "port": 8000,
+          "protocol": "HTTP",
+          "public": false
+        }
+      ],
+      "healthCheck": {
+        "protocol": "HTTP",
+        "path": "/ready",
+        "port": 8000,
+        "initialDelaySeconds": 5,
+        "periodSeconds": 10
+      },
+      "environment": {
+        "DATABASE_URL": "${POSTGRES_DB_CONNECTION_STRING}"
+      }
+    },
+    {
+      "name": "vehicle-mcp-server",
+      "plan": "nf-compute-10",
+      "build": {
+        "repository": "https://github.com/sovorn-c/vehicle-mcp-server",
+        "branch": "${MCP_REF}",
+        "dockerfilePath": "Dockerfile"
+      },
+      "ports": [
+        {
+          "port": 8080,
+          "protocol": "HTTP",
+          "public": true
+        }
+      ],
+      "healthCheck": {
+        "protocol": "HTTP",
+        "path": "/mcp",
+        "port": 8080,
+        "initialDelaySeconds": 5,
+        "periodSeconds": 10
+      },
+      "environment": {
+        "VEHICLE_MCP_PIPELINE_BASE_URL": "http://vehicle-pipeline:8000",
+        "VEHICLE_MCP_TRANSPORT": "http",
+        "VEHICLE_MCP_HTTP_HOST": "0.0.0.0",
+        "VEHICLE_MCP_ALLOW_INSECURE_BIND": "true",
+        "VEHICLE_MCP_ALLOWED_HOSTS": "${MCP_ALLOWED_HOSTS}"
+      }
+    }
+  ]
+}
