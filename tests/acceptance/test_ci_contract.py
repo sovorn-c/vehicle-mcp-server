@@ -36,12 +36,12 @@ def test_github_actions_ci_contract() -> None:
     assert "repository: sovorn-c/nz-vehicle-data-pipeline" in content, (
         "ci.yml must check out sovorn-c/nz-vehicle-data-pipeline"
     )
-    assert "21024499ec71bc09b33b136de9ca369ca052685b" in content, (
+    assert "ea49e71075118d6cdc3ed2426cb3620f69792cf6" in content, (
         "ci.yml must pin explicit pipeline ref"
     )
     assert (
-        'PIPELINE_REF="21024499ec71bc09b33b136de9ca369ca052685b"' in content
-        or "PIPELINE_REF=21024499ec71bc09b33b136de9ca369ca052685b" in content
+        'PIPELINE_REF="ea49e71075118d6cdc3ed2426cb3620f69792cf6"' in content
+        or "PIPELINE_REF=ea49e71075118d6cdc3ed2426cb3620f69792cf6" in content
     ), "ci.yml must explicitly pass PIPELINE_REF to smoke-local.sh"
     assert "contents: read" in content, "ci.yml must enforce least-privilege contents: read"
 
@@ -52,7 +52,7 @@ def test_smoke_script_verifies_pipeline_ref_and_isolated_compose() -> None:
     content = smoke_script.read_text()
 
     assert "PIPELINE_REF" in content, "smoke-local.sh must support PIPELINE_REF"
-    assert "21024499ec71bc09b33b136de9ca369ca052685b" in content, (
+    assert "ea49e71075118d6cdc3ed2426cb3620f69792cf6" in content, (
         "smoke-local.sh must declare default verified PIPELINE_REF"
     )
 

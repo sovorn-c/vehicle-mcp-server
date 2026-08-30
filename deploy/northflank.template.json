@@ -7,12 +7,12 @@
     "PIPELINE_REF": {
       "type": "string",
       "description": "Git commit SHA for sovorn-c/nz-vehicle-data-pipeline",
-      "default": "21024499ec71bc09b33b136de9ca369ca052685b"
+      "default": "ea49e71075118d6cdc3ed2426cb3620f69792cf6"
     },
     "MCP_REF": {
       "type": "string",
-      "description": "Git commit SHA or branch for sovorn-c/vehicle-mcp-server",
-      "default": "main"
+      "description": "Git commit SHA or release tag for sovorn-c/vehicle-mcp-server",
+      "default": "v0.3.0"
     },
     "MCP_ALLOWED_HOSTS": {
       "type": "string",

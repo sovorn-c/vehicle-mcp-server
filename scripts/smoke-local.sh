@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 PIPELINE_DIR="${PIPELINE_DIR:-${ROOT_DIR}/../nz-vehicle-data-pipeline}"
-PIPELINE_REF="${PIPELINE_REF:-21024499ec71bc09b33b136de9ca369ca052685b}"
+PIPELINE_REF="${PIPELINE_REF:-ea49e71075118d6cdc3ed2426cb3620f69792cf6}"
 
 PROJECT_NAME_PIPELINE="${COMPOSE_PROJECT_NAME_PIPELINE:-vehicle-pipeline-smoke}"
 PROJECT_NAME_MCP="${COMPOSE_PROJECT_NAME_MCP:-vehicle-mcp-smoke}"
