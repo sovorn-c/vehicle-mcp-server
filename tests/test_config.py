@@ -65,3 +65,72 @@ def test_package_import_writes_no_stdout(capsys: pytest.CaptureFixture[str]) -> 
     importlib.reload(vehicle_mcp_server)
     captured = capsys.readouterr()
     assert captured.out == ""
+
+
+def test_server_config_http_security_defaults() -> None:
+    config = ServerConfig()
+    assert "127.0.0.1" in config.allowed_hosts
+    assert "localhost" in config.allowed_hosts
+    assert "testserver" in config.allowed_hosts
+    assert "http://127.0.0.1" in config.allowed_origins
+    assert "http://localhost" in config.allowed_origins
+    assert config.max_request_bytes == 1_048_576
+
+
+def test_server_config_http_security_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(
+        "VEHICLE_MCP_ALLOWED_HOSTS",
+        "preview.vehicle.internal,preview2.vehicle.internal",
+    )
+    monkeypatch.setenv(
+        "VEHICLE_MCP_ALLOWED_ORIGINS",
+        "https://preview.vehicle.internal,http://preview.vehicle.internal:8080",
+    )
+    monkeypatch.setenv("VEHICLE_MCP_MAX_REQUEST_BYTES", "524288")
+
+    config = ServerConfig.from_env()
+    assert config.allowed_hosts == ("preview.vehicle.internal", "preview2.vehicle.internal")
+    assert config.allowed_origins == (
+        "https://preview.vehicle.internal",
+        "http://preview.vehicle.internal:8080",
+    )
+    assert config.max_request_bytes == 524288
+
+
+def test_server_config_rejects_deployment_wildcard_hosts() -> None:
+    with pytest.raises(ValidationError, match="wildcard"):
+        ServerConfig(allowed_hosts=("*.example.com",))
+    with pytest.raises(ValidationError, match="wildcard"):
+        ServerConfig(allowed_hosts=("*",))
+
+
+def test_server_config_rejects_malformed_hosts() -> None:
+    with pytest.raises(ValidationError, match="empty"):
+        ServerConfig(allowed_hosts=("",))
+    with pytest.raises(ValidationError, match="path"):
+        ServerConfig(allowed_hosts=("example.com/path",))
+    with pytest.raises(ValidationError, match="userinfo"):
+        ServerConfig(allowed_hosts=("user:pass@example.com",))
+    with pytest.raises(ValidationError, match="control character|whitespace"):
+        ServerConfig(allowed_hosts=("example.com\n",))
+
+
+def test_server_config_rejects_invalid_origins() -> None:
+    with pytest.raises(ValidationError, match="scheme"):
+        ServerConfig(allowed_origins=("ftp://example.com",))
+    with pytest.raises(ValidationError, match="wildcard"):
+        ServerConfig(allowed_origins=("https://*.example.com",))
+    with pytest.raises(ValidationError, match="userinfo"):
+        ServerConfig(allowed_origins=("https://user@example.com",))
+    with pytest.raises(ValidationError, match="path|query|fragment"):
+        ServerConfig(allowed_origins=("https://example.com/api",))
+    with pytest.raises(ValidationError, match="empty"):
+        ServerConfig(allowed_origins=("",))
+
+
+def test_server_config_rejects_out_of_range_max_request_bytes() -> None:
+    with pytest.raises(ValidationError):
+        ServerConfig(max_request_bytes=1000)
+    with pytest.raises(ValidationError):
+        ServerConfig(max_request_bytes=20_000_000)
+
