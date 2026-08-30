@@ -1,6 +1,6 @@
 """Vehicle Intelligence MCP Server package."""
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 SERVER_NAME = "vehicle-intelligence-mcp"
 
 __all__ = ["__version__", "SERVER_NAME"]

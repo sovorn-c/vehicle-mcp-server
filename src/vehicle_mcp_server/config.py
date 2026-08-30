@@ -39,8 +39,8 @@ class ServerConfig(BaseModel):
         description="Public server identity name",
     )
     server_version: str = Field(
-        default="0.2.0",
-        description="Semantic version of the server",
+        default="0.3.0",
+        description="Version string reported in MCP protocol metadata.",
     )
     pipeline_base_url: str = Field(
         default="http://localhost:8000",
