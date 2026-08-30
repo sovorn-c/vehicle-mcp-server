@@ -46,9 +46,9 @@ def test_documentation_contract() -> None:
     assert "rate limit" in readme.lower() or "rate-limit" in readme.lower(), (
         "README.md must document rate limiting boundaries"
     )
-    assert "sandbox" in readme.lower() or "no uptime" in readme.lower() or "sla" in readme.lower(), (
-        "README.md must document non-production / no-SLA sandbox notice"
-    )
+    assert (
+        "sandbox" in readme.lower() or "no uptime" in readme.lower() or "sla" in readme.lower()
+    ), "README.md must document non-production / no-SLA sandbox notice"
 
     # Never describe repository as a recruiting artifact or hiring portfolio
     forbidden_meta = [
@@ -59,4 +59,3 @@ def test_documentation_contract() -> None:
     ]
     for phrase in forbidden_meta:
         assert phrase not in readme.lower(), f"Forbidden recruiting trope found in README: {phrase}"
-

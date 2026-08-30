@@ -340,9 +340,7 @@ async def run_remote_smoke(http_url: str = "http://127.0.0.1:8080/mcp") -> None:
 
         # 2. Canonical lookup
         clean_vin = "1HGCR2F85HA000000"
-        lookup_res = await http_session.call_tool(
-            "lookup_vehicle", arguments={"vin": clean_vin}
-        )
+        lookup_res = await http_session.call_tool("lookup_vehicle", arguments={"vin": clean_vin})
         lookup_data = _extract_tool_payload(lookup_res)
         assert lookup_data.get("vin") == clean_vin
         assert lookup_data.get("make") == "HONDA"
@@ -398,9 +396,7 @@ def main() -> None:
 
     if "--remote-url" in sys.argv:
         idx = sys.argv.index("--remote-url")
-        target_url = (
-            sys.argv[idx + 1] if idx + 1 < len(sys.argv) else "http://127.0.0.1:8080/mcp"
-        )
+        target_url = sys.argv[idx + 1] if idx + 1 < len(sys.argv) else "http://127.0.0.1:8080/mcp"
         asyncio.run(run_remote_smoke(http_url=target_url))
     else:
         asyncio.run(run_demonstration())
