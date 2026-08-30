@@ -8,6 +8,8 @@ import httpx2
 from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.applications import Starlette
+from starlette.responses import Response
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from vehicle_mcp_server.client import VehiclePipelineClient
 from vehicle_mcp_server.config import ServerConfig
@@ -191,6 +193,75 @@ def create_server(
     return server
 
 
+class _PayloadTooLargeError(Exception):
+    """Internal sentinel exception when inbound request body exceeds maximum allowed bytes."""
+
+
+class RequestSizeLimitMiddleware:
+    """Focused ASGI boundary enforcing cumulative inbound request body byte limits."""
+
+    def __init__(self, app: ASGIApp, max_request_bytes: int) -> None:
+        self.app = app
+        self.max_request_bytes = max_request_bytes
+
+    async def __call__(
+        self,
+        scope: Scope,
+        receive: Receive,
+        send: Send,
+    ) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        # 1. Fast check on declared Content-Length header if present
+        for raw_name, raw_value in scope.get("headers", []):
+            if raw_name.lower() == b"content-length":
+                try:
+                    if int(raw_value) > self.max_request_bytes:
+                        response = Response(
+                            "Payload Too Large",
+                            status_code=413,
+                            media_type="text/plain",
+                        )
+                        await response(scope, receive, send)
+                        return
+                except (ValueError, UnicodeDecodeError):
+                    pass
+                break
+
+        # 2. Cumulative counting on streaming receive
+        cumulative_bytes = 0
+        response_started = False
+
+        async def guarded_send(message: Message) -> None:
+            nonlocal response_started
+            if message["type"] == "http.response.start":
+                response_started = True
+            await send(message)
+
+        async def counting_receive() -> Message:
+            nonlocal cumulative_bytes
+            message = await receive()
+            if message["type"] == "http.request":
+                body = message.get("body", b"")
+                cumulative_bytes += len(body)
+                if cumulative_bytes > self.max_request_bytes:
+                    raise _PayloadTooLargeError()
+            return message
+
+        try:
+            await self.app(scope, counting_receive, guarded_send)
+        except _PayloadTooLargeError:
+            if not response_started:
+                response = Response(
+                    "Payload Too Large",
+                    status_code=413,
+                    media_type="text/plain",
+                )
+                await response(scope, receive, send)
+
+
 def create_streamable_http_app(
     config: ServerConfig | None = None,
     transport: httpx2.AsyncBaseTransport | None = None,
@@ -203,8 +274,13 @@ def create_streamable_http_app(
         allowed_hosts=list(resolved_config.allowed_hosts),
         allowed_origins=list(resolved_config.allowed_origins),
     )
-    return server.streamable_http_app(
+    app = server.streamable_http_app(
         stateless_http=True,
         transport_security=security_settings,
         host=resolved_config.http_host,
     )
+    app.add_middleware(
+        RequestSizeLimitMiddleware,
+        max_request_bytes=resolved_config.max_request_bytes,
+    )
+    return app
