@@ -1,4 +1,4 @@
-"""Tests for private Streamable HTTP serving, security settings, and transport."""
+from collections.abc import Iterator
 
 import pytest
 from starlette.testclient import TestClient
@@ -118,3 +118,44 @@ def test_streamable_http_uses_configured_host_and_origin_policy() -> None:
             content="{}",
         )
         assert resp_loopback.status_code in (400, 403, 421)
+
+
+def test_streamable_http_rejects_oversized_declared_content_length() -> None:
+    config = ServerConfig(transport="http", max_request_bytes=20_000)
+    app = create_streamable_http_app(config)
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        payload = "x" * 25_000
+        resp = client.post(
+            "/mcp",
+            headers={
+                "Host": "127.0.0.1",
+                "Origin": "http://localhost",
+                "Content-Type": "application/json",
+            },
+            content=payload,
+        )
+        assert resp.status_code == 413
+
+
+def test_streamable_http_rejects_oversized_chunked_request_body() -> None:
+    config = ServerConfig(transport="http", max_request_bytes=20_000)
+    app = create_streamable_http_app(config)
+
+    def chunks() -> Iterator[bytes]:
+        yield b'{"jsonrpc":"2.0","method":"tools/list","params":{"pad":"'
+        yield b"x" * 25_000
+        yield b'"},"id":1}'
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        resp = client.post(
+            "/mcp",
+            headers={
+                "Host": "127.0.0.1",
+                "Origin": "http://localhost",
+                "Content-Type": "application/json",
+            },
+            content=chunks(),
+        )
+        assert resp.status_code == 413
+
