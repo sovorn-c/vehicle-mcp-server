@@ -118,4 +118,3 @@ def test_streamable_http_uses_configured_host_and_origin_policy() -> None:
             content="{}",
         )
         assert resp_loopback.status_code in (400, 403, 421)
-

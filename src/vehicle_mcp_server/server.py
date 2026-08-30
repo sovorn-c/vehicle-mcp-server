@@ -200,24 +200,8 @@ def create_streamable_http_app(
     server = create_server(resolved_config, transport=transport)
     security_settings = TransportSecuritySettings(
         enable_dns_rebinding_protection=True,
-        allowed_hosts=[
-            "127.0.0.1",
-            "127.0.0.1:*",
-            "localhost",
-            "localhost:*",
-            "[::1]",
-            "[::1]:*",
-            "testserver",
-            "testserver:*",
-        ],
-        allowed_origins=[
-            "http://127.0.0.1",
-            "http://127.0.0.1:*",
-            "http://localhost",
-            "http://localhost:*",
-            "http://[::1]",
-            "http://[::1]:*",
-        ],
+        allowed_hosts=list(resolved_config.allowed_hosts),
+        allowed_origins=list(resolved_config.allowed_origins),
     )
     return server.streamable_http_app(
         stateless_http=True,
