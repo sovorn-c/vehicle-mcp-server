@@ -131,7 +131,7 @@ async def safe_tool_boundary[T](
     except ToolError:
         raise
     except Exception as exc:
-        print(f"[INTERNAL_ERROR] {tool_name} error: {exc}", file=sys.stderr)
+        print(f"[INTERNAL_ERROR] {tool_name} error: {type(exc).__name__}", file=sys.stderr)
         raise ToolError(
             SafeError(
                 category=SafeErrorCategory.INTERNAL_ERROR,
