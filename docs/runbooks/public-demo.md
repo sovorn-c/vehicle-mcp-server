@@ -36,7 +36,7 @@ The demonstration runs on the **Northflank Developer Sandbox** behind **Cloudfla
    - **Step B: Migration (`db-migrate`):** Run `uv run alembic upgrade head` to establish the schema.
    - **Step C: Seed (`db-seed`):** Run `python -m nz_vehicle_data_pipeline.cli.seed --manifest fixtures/manifest.json --phase2` to populate deterministic fixtures.
    - **Step D: Service Readiness:** Start `vehicle-pipeline` and confirm `/ready` returns HTTP 200.
-   - **Step E: MCP Exposure:** Start `vehicle-mcp-server` with `VEHICLE_MCP_ALLOWED_HOSTS` matching the Cloudflare hostname.
+   - **Step E: MCP Exposure:** Start `vehicle-mcp-server` with `VEHICLE_MCP_ALLOWED_HOSTS` and `VEHICLE_MCP_ALLOWED_ORIGINS` matching the Cloudflare hostname and public origin.
 
 ---
 

@@ -18,6 +18,11 @@
       "type": "string",
       "description": "Approved public hostname for MCP server",
       "default": "demo.vehicle-intelligence.nz"
+    },
+    "MCP_ALLOWED_ORIGINS": {
+      "type": "string",
+      "description": "Approved public origin for MCP server",
+      "default": "https://demo.vehicle-intelligence.nz"
     }
   },
   "addons": [
@@ -120,7 +125,8 @@
         "VEHICLE_MCP_TRANSPORT": "http",
         "VEHICLE_MCP_HTTP_HOST": "0.0.0.0",
         "VEHICLE_MCP_ALLOW_INSECURE_BIND": "true",
-        "VEHICLE_MCP_ALLOWED_HOSTS": "${MCP_ALLOWED_HOSTS}"
+        "VEHICLE_MCP_ALLOWED_HOSTS": "${MCP_ALLOWED_HOSTS}",
+        "VEHICLE_MCP_ALLOWED_ORIGINS": "${MCP_ALLOWED_ORIGINS}"
       }
     }
   ]

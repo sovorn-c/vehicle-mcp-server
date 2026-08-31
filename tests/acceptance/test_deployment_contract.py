@@ -108,3 +108,23 @@ def test_northflank_template_health_checks_and_free_plans() -> None:
         assert "free" in plan.lower() or "sandbox" in plan.lower() or "nf-addon" in plan.lower(), (
             f"Addon {a.get('name')} must use free-tier plan, got {plan}"
         )
+
+
+def test_northflank_template_host_and_origin_environment() -> None:
+    template_path = Path("deploy/northflank.template.json")
+    data = json.loads(template_path.read_text())
+
+    parameters = data.get("parameters", {})
+    assert "MCP_ALLOWED_HOSTS" in parameters, "Template must declare MCP_ALLOWED_HOSTS parameter"
+    assert "MCP_ALLOWED_ORIGINS" in parameters, (
+        "Template must declare MCP_ALLOWED_ORIGINS parameter"
+    )
+    assert (
+        parameters["MCP_ALLOWED_ORIGINS"].get("default") == "https://demo.vehicle-intelligence.nz"
+    )
+
+    services = data.get("services", data.get("spec", {}).get("services", []))
+    mcp_service = next(s for s in services if "mcp" in s.get("name", ""))
+    env = mcp_service.get("environment", {})
+    assert env.get("VEHICLE_MCP_ALLOWED_HOSTS") == "${MCP_ALLOWED_HOSTS}"
+    assert env.get("VEHICLE_MCP_ALLOWED_ORIGINS") == "${MCP_ALLOWED_ORIGINS}"

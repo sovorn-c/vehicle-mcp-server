@@ -11,38 +11,20 @@ def main() -> None:
     """Main CLI entrypoint running stdio or Streamable HTTP transport."""
     setup_logging()
     config = ServerConfig.from_env()
-    server = create_server(config)
-
     if config.transport == "stdio":
+        server = create_server(config)
         server.run(transport="stdio")
     elif config.transport == "http":
-        from mcp.server.transport_security import TransportSecuritySettings
+        import uvicorn
 
-        security_settings = TransportSecuritySettings(
-            enable_dns_rebinding_protection=True,
-            allowed_hosts=[
-                "127.0.0.1",
-                "127.0.0.1:*",
-                "localhost",
-                "localhost:*",
-                "[::1]",
-                "[::1]:*",
-            ],
-            allowed_origins=[
-                "http://127.0.0.1",
-                "http://127.0.0.1:*",
-                "http://localhost",
-                "http://localhost:*",
-                "http://[::1]",
-                "http://[::1]:*",
-            ],
-        )
-        server.run(
-            transport="streamable-http",
+        from vehicle_mcp_server.server import create_streamable_http_app
+
+        app = create_streamable_http_app(config)
+        uvicorn.run(
+            app,
             host=config.http_host,
             port=config.http_port,
-            stateless_http=True,
-            transport_security=security_settings,
+            log_level="info",
         )
     else:
         print(f"[ERROR] Unsupported transport: {config.transport}", file=sys.stderr)
