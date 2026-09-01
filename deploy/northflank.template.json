@@ -31,7 +31,7 @@
       "type": "postgresql",
       "plan": "nf-addon-free",
       "publicAccess": false,
-      "version": "16",
+      "version": "17",
       "storage": {
         "size": "1GB"
       }
