@@ -15,6 +15,20 @@ def test_public_smoke_script_contract() -> None:
     assert "PUBLIC_MCP_URL" in content, "smoke-public.sh must support PUBLIC_MCP_URL configuration"
 
 
+def test_public_smoke_uses_current_endpoint_and_response_contracts() -> None:
+    workflow = Path(".github/workflows/public-smoke.yml").read_text()
+    demo = Path("src/vehicle_mcp_server/demo.py").read_text()
+
+    assert "https://vehicle-mcp.chhlatbot.com/mcp" in workflow
+    assert "demo.vehicle-intelligence.nz" not in workflow
+    assert 'lookup_data.get("canonical_fields", {}).get("make")' in demo
+    assert 'explain_data.get("outcome")' in demo
+    assert "temporal_vin = next(" in demo
+    assert "obs_id = next(" in demo
+    assert "7A8B9C0D1E2F3G4H5" not in demo
+    assert "obs-2026-0001" not in demo
+
+
 def test_github_actions_public_smoke_workflow() -> None:
     workflow_path = Path(".github/workflows/public-smoke.yml")
     assert workflow_path.exists(), ".github/workflows/public-smoke.yml must exist"
