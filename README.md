@@ -138,67 +138,30 @@ Docker Compose publishes the MCP endpoint on loopback at `127.0.0.1:8080`.
 
 The server is model- and client-agnostic. Any MCP client that supports stdio or Streamable HTTP can use the same six tools.
 
-### Public demonstration & remote MCP connection
+### Public ready-to-test demo
 
-The repository provides infrastructure-as-code and edge configurations to deploy a public demonstration over Streamable HTTP behind Cloudflare at:
+A hosted Streamable HTTP endpoint is available for a quick evaluation without running the services locally:
 
 ```text
-https://demo.vehicle-intelligence.nz/mcp
+https://vehicle-mcp.chhlatbot.com/mcp
 ```
 
-> **Deployment Notice:** Public demonstration infrastructure is defined in [`deploy/northflank.template.json`](deploy/northflank.template.json) and [`deploy/cloudflare-edge.json`](deploy/cloudflare-edge.json). Provisioning and operations are documented in the [Public Demo Runbook](docs/runbooks/public-demo.md). When evaluating locally, use `http://127.0.0.1:8080/mcp`.
-
-#### Disclaimers & operational boundaries
-
-- **Synthetic data only:** All vehicles, registrations, and inspection records are deterministic synthetic fixtures. This server does not connect to live or restricted NZ transport registers.
-- **Developer Sandbox tier:** Hosted on Northflank Developer Sandbox compute with Cloudflare edge protection. It is a non-production demonstration environment with no uptime SLA, high availability, or commercial support guarantee.
-- **Edge rate limiting:** Inbound requests are rate-limited to 60 requests per minute per IP to protect sandbox capacity.
-
-#### Remote Codex CLI configuration
-
-Configure the remote MCP server in `~/.codex/config.json`:
-
-```json
-{
-  "mcpServers": {
-    "vehicle-intelligence": {
-      "url": "https://demo.vehicle-intelligence.nz/mcp"
-    }
-  }
-}
-```
-
-#### Remote Claude Desktop configuration
-
-Add the remote Streamable HTTP server to `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "vehicle-intelligence-remote": {
-      "url": "https://demo.vehicle-intelligence.nz/mcp"
-    }
-  }
-}
-```
-
-#### Generic Streamable HTTP client
+Verified live on 2026-09-01. Add it to the Codex CLI:
 
 ```bash
-curl -X POST https://demo.vehicle-intelligence.nz/mcp \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -d '{"jsonrpc": "2.0", "method": "tools/list", "id": 1}'
+codex mcp add vehicle-intelligence-public \
+  --url https://vehicle-mcp.chhlatbot.com/mcp
 ```
 
-Verify the public endpoint with the verification script:
+Start Codex, run `/mcp` to confirm `vehicle-intelligence-public` is connected, then try:
 
-```bash
-PUBLIC_MCP_URL="https://demo.vehicle-intelligence.nz/mcp" bash scripts/smoke-public.sh
+```text
+Use vehicle-intelligence-public to list the available vehicles. Report their makes and total count.
 ```
 
+The hosted endpoint contains synthetic demonstration data only and has no uptime SLA. If it is unavailable, use the local stdio setup below, which remains the primary supported setup.
 
-### OpenAI Codex
+### OpenAI Codex (local stdio)
 
 Register the stdio server with the Codex CLI. Replace `/path/to/vehicle-mcp-server` with the local repository path.
 

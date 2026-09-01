@@ -41,7 +41,7 @@ def test_documentation_contract() -> None:
     assert "synthetic" in readme.lower() or "limitation" in readme.lower()
 
     # Public demonstration & remote MCP client connection
-    assert "demo.vehicle-intelligence.nz" in readme, "README.md must document public demo URL"
+    assert "vehicle-mcp.chhlatbot.com/mcp" in readme, "README.md must document public demo URL"
     assert "codex" in readme.lower(), "README.md must document Codex client setup"
     assert "rate limit" in readme.lower() or "rate-limit" in readme.lower(), (
         "README.md must document rate limiting boundaries"
