@@ -6,7 +6,7 @@ on:
       target_url:
         description: "Public MCP Server URL to smoke test"
         required: false
-        default: "https://demo.vehicle-intelligence.nz/mcp"
+        default: "https://vehicle-mcp.chhlatbot.com/mcp"
   schedule:
     - cron: "0 6 * * *"
 
@@ -38,6 +38,6 @@ jobs:
 
       - name: Run public smoke verification
         env:
-          PUBLIC_MCP_URL: ${{ inputs.target_url || 'https://demo.vehicle-intelligence.nz/mcp' }}
+          PUBLIC_MCP_URL: ${{ inputs.target_url || 'https://vehicle-mcp.chhlatbot.com/mcp' }}
         run: |
           bash scripts/smoke-public.sh

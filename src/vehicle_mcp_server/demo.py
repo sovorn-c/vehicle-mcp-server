@@ -336,14 +336,15 @@ async def run_remote_smoke(http_url: str = "http://127.0.0.1:8080/mcp") -> None:
         catalog = _extract_tool_payload(cat_res)
         assert isinstance(catalog, dict)
         assert catalog.get("total") == 5, f"Expected 5 vehicles, got {catalog.get('total')}"
-        print(f"==> Catalog discovery passed: {len(catalog.get('items', []))} items verified")
+        items = catalog.get("items", [])
+        print(f"==> Catalog discovery passed: {len(items)} items verified")
 
         # 2. Canonical lookup
-        clean_vin = "1HGCR2F85HA000000"
+        clean_vin = next(item["vin"] for item in items if item.get("make") == "HONDA")
         lookup_res = await http_session.call_tool("lookup_vehicle", arguments={"vin": clean_vin})
         lookup_data = _extract_tool_payload(lookup_res)
         assert lookup_data.get("vin") == clean_vin
-        assert lookup_data.get("make") == "HONDA"
+        assert lookup_data.get("canonical_fields", {}).get("make") == "HONDA"
         print(f"==> Canonical lookup passed for {clean_vin}")
 
         # 3. Field explanation
@@ -352,12 +353,13 @@ async def run_remote_smoke(http_url: str = "http://127.0.0.1:8080/mcp") -> None:
             arguments={"vin": clean_vin, "field_name": "color"},
         )
         explain_data = _extract_tool_payload(explain_res)
-        assert explain_data.get("status") in ("RESOLVED", "UNRESOLVED", "ABSENT")
+        assert explain_data.get("outcome") in ("RESOLVED", "UNRESOLVED", "ABSENT")
         print(f"==> Field explanation passed for {clean_vin}.color")
 
         # 4. History
+        temporal_vin = next(item["vin"] for item in items if item.get("revision_number", 1) >= 2)
         hist_res = await http_session.call_tool(
-            "get_vehicle_history", arguments={"vin": "7A8B9C0D1E2F3G4H5"}
+            "get_vehicle_history", arguments={"vin": temporal_vin}
         )
         hist_data = _extract_tool_payload(hist_res)
         assert isinstance(hist_data, list)
@@ -367,14 +369,19 @@ async def run_remote_smoke(http_url: str = "http://127.0.0.1:8080/mcp") -> None:
         # 5. Revision
         rev_res = await http_session.call_tool(
             "get_vehicle_revision",
-            arguments={"vin": "7A8B9C0D1E2F3G4H5", "revision_number": 1},
+            arguments={"vin": temporal_vin, "revision_number": 1},
         )
         rev_data = _extract_tool_payload(rev_res)
         assert rev_data.get("revision_number") == 1
         print("==> Exact revision retrieval passed")
 
         # 6. Source observation (safe metadata inspection, NEVER printing raw payload)
-        obs_id = "obs-2026-0001"
+        obs_id = next(
+            provenance["observation_id"]
+            for entries in rev_data.get("field_provenance", {}).values()
+            for provenance in entries
+            if provenance.get("observation_id")
+        )
         obs_res = await http_session.call_tool(
             "get_source_observation",
             arguments={"observation_id": obs_id},
