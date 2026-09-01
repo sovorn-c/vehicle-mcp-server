@@ -7,9 +7,6 @@ on:
         description: "Public MCP Server URL to smoke test"
         required: false
         default: "https://vehicle-mcp.chhlatbot.com/mcp"
-  schedule:
-    - cron: "0 6 * * *"
-
 permissions:
   contents: read
 

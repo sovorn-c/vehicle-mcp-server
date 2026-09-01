@@ -35,7 +35,7 @@ def test_github_actions_public_smoke_workflow() -> None:
 
     content = workflow_path.read_text()
     assert "workflow_dispatch:" in content, "public-smoke.yml must support manual trigger"
-    assert "schedule:" in content, "public-smoke.yml must support scheduled trigger"
+    assert "schedule:" not in content, "public-smoke.yml must not run against the edge on a daily schedule"
     assert "contents: read" in content, (
         "public-smoke.yml must enforce least-privilege contents: read"
     )
