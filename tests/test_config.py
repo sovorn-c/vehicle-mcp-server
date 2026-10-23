@@ -3,13 +3,14 @@
 import pytest
 from pydantic import ValidationError
 
+from vehicle_mcp_server import __version__
 from vehicle_mcp_server.config import ServerConfig
 
 
 def test_server_config_defaults() -> None:
     config = ServerConfig()
     assert config.server_name == "vehicle-intelligence-mcp"
-    assert config.server_version == "0.3.0"
+    assert config.server_version == __version__
     assert str(config.pipeline_base_url).rstrip("/") == "http://localhost:8000"
     assert config.transport == "stdio"
     assert config.http_host == "127.0.0.1"
