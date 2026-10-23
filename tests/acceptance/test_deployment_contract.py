@@ -119,9 +119,7 @@ def test_northflank_template_host_and_origin_environment() -> None:
     assert "MCP_ALLOWED_ORIGINS" in parameters, (
         "Template must declare MCP_ALLOWED_ORIGINS parameter"
     )
-    assert (
-        parameters["MCP_ALLOWED_ORIGINS"].get("default") == "https://demo.vehicle-intelligence.nz"
-    )
+    assert parameters["MCP_ALLOWED_ORIGINS"].get("default") == "https://vehicle-mcp.chhlatbot.com"
 
     services = data.get("services", data.get("spec", {}).get("services", []))
     mcp_service = next(s for s in services if "mcp" in s.get("name", ""))

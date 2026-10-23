@@ -20,10 +20,10 @@ The demonstration runs on the **Northflank Developer Sandbox** behind **Cloudfla
 
 1. **Owner Approvals:**
    - Explicit approval for Northflank identity payment verification.
-   - Cloudflare-managed domain assignment (`vehicle-intelligence.nz`).
+   - Cloudflare-managed domain assignment (`chhlatbot.com`).
 2. **Pinned Commit References:**
    - Pipeline Ref: `ea49e71075118d6cdc3ed2426cb3620f69792cf6`
-   - MCP Server Ref: Immutable release tag `v0.3.0` or exact reviewed commit SHA (never mutable branch `main`)
+   - MCP Server Ref: Immutable release tag `v0.4.0` or exact reviewed commit SHA (never mutable branch `main`)
 
 ---
 
@@ -43,7 +43,7 @@ The demonstration runs on the **Northflank Developer Sandbox** behind **Cloudfla
 ## 3. Edge Configuration (Cloudflare)
 
 Apply rules from [`deploy/cloudflare-edge.json`](../../deploy/cloudflare-edge.json):
-1. **DNS:** CNAME `demo.vehicle-intelligence.nz` pointing to Northflank preview domain with Cloudflare Proxy enabled.
+1. **DNS:** CNAME `vehicle-mcp.chhlatbot.com` pointing to Northflank preview domain with Cloudflare Proxy enabled.
 2. **TLS:** Strict origin SSL validation.
 3. **Cache:** Bypass edge caching for `/mcp*`, `/v1/*`, `/docs*`, and `/openapi.json`.
 4. **Rate Limiting:** Enforce 60 requests per 60 seconds per IP on `/mcp*`, responding with HTTP 429.
