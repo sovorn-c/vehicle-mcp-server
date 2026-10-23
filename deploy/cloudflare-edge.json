@@ -1,9 +1,9 @@
 {
-  "zone": "vehicle-intelligence.nz",
+  "zone": "chhlatbot.com",
   "dns_records": [
     {
       "type": "CNAME",
-      "name": "demo.vehicle-intelligence.nz",
+      "name": "vehicle-mcp.chhlatbot.com",
       "content": "vehicle-mcp-server.sandbox.northflank.app",
       "proxied": true,
       "comment": "Public MCP Streamable HTTP endpoint"
