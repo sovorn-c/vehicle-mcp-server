@@ -12,7 +12,7 @@
     "MCP_REF": {
       "type": "string",
       "description": "Git commit SHA or release tag for sovorn-c/vehicle-mcp-server",
-      "default": "v0.4.0"
+      "default": "v0.4.1"
     },
     "MCP_ALLOWED_HOSTS": {
       "type": "string",

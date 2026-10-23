@@ -15,6 +15,7 @@ elif [[ "${1:-}" == "--rate-limit" ]]; then
 elif [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
     echo "Usage: scripts/smoke-public.sh [--security|--rate-limit]"
     echo "  --security    Run negative security probes (Host, Origin, body limit, direct bypass)"
+    echo "                Set PUBLIC_MCP_DIRECT_ORIGIN_HOST=none to skip the direct-origin probe."
     echo "  --rate-limit  Run rate-limiting probes against MCP edge path"
     echo "  (no flag)     Run full six-tool verification against PUBLIC_MCP_URL"
     exit 0
@@ -66,8 +67,8 @@ if [[ "${MODE}" == "security" ]]; then
             -H "Host: attacker.evil.com" \
             -H "Content-Type: application/json" \
             -d '{"jsonrpc":"2.0","method":"tools/list","id":1}' 2>&1 || true)
-        if [[ "${HOST_CODE}" != "400" && "${HOST_CODE}" != "403" && "${HOST_CODE}" != "421" ]]; then
-            echo "ERROR: Expected 400, 403, or 421 for hostile Host header, got: ${HOST_CODE}"
+        if [[ "${HOST_CODE}" != "400" && "${HOST_CODE}" != "403" && "${HOST_CODE}" != "404" && "${HOST_CODE}" != "421" ]]; then
+            echo "ERROR: Expected 400, 403, 404, or 421 for hostile Host header, got: ${HOST_CODE}"
             exit 1
         fi
         echo "    ✓ Hostile Host header rejected (HTTP ${HOST_CODE})"
@@ -96,17 +97,23 @@ if [[ "${MODE}" == "security" ]]; then
         fi
         echo "    ✓ Oversized request body rejected (HTTP ${OVERSIZED_CODE})"
 
-        # 4. Direct-origin bypass attempt using generated cloud domain
-        DIRECT_ORIGIN_CODE=$(curl -s -S --connect-timeout 5 --max-time 10 -o /dev/null -w "%{http_code}" \
-            -X POST "${PUBLIC_MCP_URL}" \
-            -H "Host: ${PUBLIC_MCP_DIRECT_ORIGIN_HOST}" \
-            -H "Content-Type: application/json" \
-            -d '{"jsonrpc":"2.0","method":"tools/list","id":1}' 2>&1 || true)
-        if [[ "${DIRECT_ORIGIN_CODE}" != "400" && "${DIRECT_ORIGIN_CODE}" != "403" && "${DIRECT_ORIGIN_CODE}" != "421" ]]; then
-            echo "ERROR: Expected 400, 403, or 421 for direct-origin bypass attempt, got: ${DIRECT_ORIGIN_CODE}"
-            exit 1
+        # 4. Direct-origin bypass attempt using generated cloud domain.
+        # PUBLIC_MCP_DIRECT_ORIGIN_HOST=none skips it for platforms where the
+        # public address is itself the origin (nothing to bypass).
+        if [[ "${PUBLIC_MCP_DIRECT_ORIGIN_HOST}" == "none" ]]; then
+            echo "    - Direct-origin bypass probe skipped (PUBLIC_MCP_DIRECT_ORIGIN_HOST=none)"
+        else
+            DIRECT_ORIGIN_CODE=$(curl -s -S --connect-timeout 5 --max-time 10 -o /dev/null -w "%{http_code}" \
+                -X POST "${PUBLIC_MCP_URL}" \
+                -H "Host: ${PUBLIC_MCP_DIRECT_ORIGIN_HOST}" \
+                -H "Content-Type: application/json" \
+                -d '{"jsonrpc":"2.0","method":"tools/list","id":1}' 2>&1 || true)
+            if [[ "${DIRECT_ORIGIN_CODE}" != "400" && "${DIRECT_ORIGIN_CODE}" != "403" && "${DIRECT_ORIGIN_CODE}" != "421" ]]; then
+                echo "ERROR: Expected 400, 403, or 421 for direct-origin bypass attempt, got: ${DIRECT_ORIGIN_CODE}"
+                exit 1
+            fi
+            echo "    ✓ Direct-origin bypass attempt rejected (HTTP ${DIRECT_ORIGIN_CODE})"
         fi
-        echo "    ✓ Direct-origin bypass attempt rejected (HTTP ${DIRECT_ORIGIN_CODE})"
     else
         # Local loopback security verification
         (

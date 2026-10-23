@@ -139,8 +139,8 @@ Docker Compose publishes the MCP endpoint on loopback at `127.0.0.1:8080`.
 Version tags publish a `linux/amd64` image to GitHub Container Registry. `.github/workflows/release.yml` builds it, attaches a build-provenance attestation, and refuses to publish unless the tag, `pyproject.toml`, and package version agree.
 
 ```bash
-docker pull ghcr.io/sovorn-c/vehicle-mcp-server:0.4.0
-gh attestation verify oci://ghcr.io/sovorn-c/vehicle-mcp-server:0.4.0 --owner sovorn-c
+docker pull ghcr.io/sovorn-c/vehicle-mcp-server:0.4.1
+gh attestation verify oci://ghcr.io/sovorn-c/vehicle-mcp-server:0.4.1 --owner sovorn-c
 ```
 
 Run it against a pipeline on the host, publishing the endpoint on loopback only:
@@ -148,7 +148,7 @@ Run it against a pipeline on the host, publishing the endpoint on loopback only:
 ```bash
 docker run --rm -p 127.0.0.1:8080:8080 \
   -e VEHICLE_MCP_PIPELINE_BASE_URL="http://host.docker.internal:8000" \
-  ghcr.io/sovorn-c/vehicle-mcp-server:0.4.0
+  ghcr.io/sovorn-c/vehicle-mcp-server:0.4.1
 ```
 
 Behind a public hostname, also set `VEHICLE_MCP_ALLOWED_HOSTS` and `VEHICLE_MCP_ALLOWED_ORIGINS` (comma-separated) to that hostname. Deployments should pin the image digest rather than the tag.
@@ -364,4 +364,4 @@ Deployers can call `.github/workflows/public-smoke.yml` as a reusable workflow w
 
 ## Project status
 
-Release `0.4.0` provides six read-only tools over stdio and Streamable HTTP with hardened public deployment and edge rate-limiting contracts, attested GHCR container images, and a reusable post-deploy smoke workflow.
+Release `0.4.1` provides six read-only tools over stdio and Streamable HTTP with hardened public deployment and edge rate-limiting contracts, attested GHCR container images, and a reusable post-deploy smoke workflow.
