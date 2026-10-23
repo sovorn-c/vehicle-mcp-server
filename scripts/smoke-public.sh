@@ -67,8 +67,14 @@ if [[ "${MODE}" == "security" ]]; then
             -H "Host: attacker.evil.com" \
             -H "Content-Type: application/json" \
             -d '{"jsonrpc":"2.0","method":"tools/list","id":1}' 2>&1 || true)
-        if [[ "${HOST_CODE}" != "400" && "${HOST_CODE}" != "403" && "${HOST_CODE}" != "404" && "${HOST_CODE}" != "421" ]]; then
-            echo "ERROR: Expected 400, 403, 404, or 421 for hostile Host header, got: ${HOST_CODE}"
+        # A platform ingress that is itself the origin (opt-out mode) answers an
+        # unknown Host with 404 before the server sees it; elsewhere 404 is a failure.
+        HOST_OK_CODES=" 400 403 421 "
+        if [[ "${PUBLIC_MCP_DIRECT_ORIGIN_HOST}" == "none" ]]; then
+            HOST_OK_CODES=" 400 403 404 421 "
+        fi
+        if [[ "${HOST_OK_CODES}" != *" ${HOST_CODE} "* ]]; then
+            echo "ERROR: Expected one of${HOST_OK_CODES}for hostile Host header, got: ${HOST_CODE}"
             exit 1
         fi
         echo "    ✓ Hostile Host header rejected (HTTP ${HOST_CODE})"

@@ -72,14 +72,13 @@ def test_opt_out_skips_direct_origin_probe_and_accepts_ingress_404(ingress_url: 
     assert "Direct-origin bypass probe skipped" in result.stdout
 
 
-def test_default_still_probes_northflank_host(ingress_url: str) -> None:
+def test_default_rejects_404_for_hostile_host(ingress_url: str) -> None:
     result = run_security(ingress_url, None)
     assert result.returncode == 1
-    assert "direct-origin bypass attempt" in result.stdout
-    assert "got: 404" in result.stdout
+    assert "for hostile Host header, got: 404" in result.stdout
 
 
-def test_explicit_host_is_probed(ingress_url: str) -> None:
+def test_explicit_host_rejects_404_for_hostile_host(ingress_url: str) -> None:
     result = run_security(ingress_url, NORTHFLANK_HOST)
     assert result.returncode == 1
-    assert "direct-origin bypass attempt" in result.stdout
+    assert "for hostile Host header, got: 404" in result.stdout
