@@ -5,10 +5,10 @@ AGENTS.md
 CONVENTIONS.md
 claude.md
 agents.md
-.codex/
-.codex
-.pi/
-.pi
+# omp (Oh My Pi) project state and superpowers worktrees
+.omp/
+.worktrees/
+docs/superpowers/
 
 # Secrets and local environments
 .env

@@ -134,6 +134,25 @@ docker compose up -d --build
 
 Docker Compose publishes the MCP endpoint on loopback at `127.0.0.1:8080`.
 
+### Container image
+
+Version tags publish a `linux/amd64` image to GitHub Container Registry. `.github/workflows/release.yml` builds it, attaches a build-provenance attestation, and refuses to publish unless the tag, `pyproject.toml`, and package version agree.
+
+```bash
+docker pull ghcr.io/sovorn-c/vehicle-mcp-server:0.4.0
+gh attestation verify oci://ghcr.io/sovorn-c/vehicle-mcp-server:0.4.0 --owner sovorn-c
+```
+
+Run it against a pipeline on the host, publishing the endpoint on loopback only:
+
+```bash
+docker run --rm -p 127.0.0.1:8080:8080 \
+  -e VEHICLE_MCP_PIPELINE_BASE_URL="http://host.docker.internal:8000" \
+  ghcr.io/sovorn-c/vehicle-mcp-server:0.4.0
+```
+
+Behind a public hostname, also set `VEHICLE_MCP_ALLOWED_HOSTS` and `VEHICLE_MCP_ALLOWED_ORIGINS` (comma-separated) to that hostname. Deployments should pin the image digest rather than the tag.
+
 ## Connect an MCP client
 
 The server is model- and client-agnostic. Any MCP client that supports stdio or Streamable HTTP can use the same six tools.
@@ -341,6 +360,8 @@ PIPELINE_DIR="../nz-vehicle-data-pipeline" bash scripts/smoke-local.sh
 
 The CI workflow repeats the preflight stages and runs the smoke check against the pinned compatible pipeline revision.
 
+Deployers can call `.github/workflows/public-smoke.yml` as a reusable workflow with a `target_url` and an optional `direct_origin_host`. It runs the six-tool journey and the negative security probes against that URL.
+
 ## Project status
 
-Release `0.3.0` provides six read-only tools over stdio and Streamable HTTP with hardened public deployment and edge rate-limiting contracts.
+Release `0.4.0` provides six read-only tools over stdio and Streamable HTTP with hardened public deployment and edge rate-limiting contracts, attested GHCR container images, and a reusable post-deploy smoke workflow.

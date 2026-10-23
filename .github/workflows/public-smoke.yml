@@ -7,6 +7,21 @@ on:
         description: "Public MCP Server URL to smoke test"
         required: false
         default: "https://vehicle-mcp.chhlatbot.com/mcp"
+      direct_origin_host:
+        description: "Platform-generated hostname for the direct-origin probe (optional)"
+        required: false
+        default: ""
+  workflow_call:
+    inputs:
+      target_url:
+        description: "Public MCP Server URL to smoke test"
+        required: true
+        type: string
+      direct_origin_host:
+        description: "Platform-generated hostname for the direct-origin probe (optional)"
+        required: false
+        type: string
+        default: ""
 permissions:
   contents: read
 
@@ -18,11 +33,14 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v5
         with:
-          version: "latest"
+          version: "0.5.26"
           enable-cache: true
 
       - name: Set up Python
@@ -31,10 +49,17 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: uv sync --frozen || uv sync
+        run: uv sync --frozen
 
       - name: Run public smoke verification
         env:
           PUBLIC_MCP_URL: ${{ inputs.target_url || 'https://vehicle-mcp.chhlatbot.com/mcp' }}
         run: |
           bash scripts/smoke-public.sh
+
+      - name: Run public security probes
+        env:
+          PUBLIC_MCP_URL: ${{ inputs.target_url || 'https://vehicle-mcp.chhlatbot.com/mcp' }}
+          PUBLIC_MCP_DIRECT_ORIGIN_HOST: ${{ inputs.direct_origin_host }}
+        run: |
+          bash scripts/smoke-public.sh --security

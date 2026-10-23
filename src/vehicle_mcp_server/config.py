@@ -6,6 +6,8 @@ from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from vehicle_mcp_server import __version__
+
 DEFAULT_ALLOWED_HOSTS: tuple[str, ...] = (
     "127.0.0.1",
     "127.0.0.1:*",
@@ -39,7 +41,7 @@ class ServerConfig(BaseModel):
         description="Public server identity name",
     )
     server_version: str = Field(
-        default="0.3.0",
+        default=__version__,
         description="Version string reported in MCP protocol metadata.",
     )
     pipeline_base_url: str = Field(
