@@ -11,6 +11,11 @@ on:
         description: "Platform-generated hostname for the direct-origin probe (optional)"
         required: false
         default: ""
+      skip_on_edge_block:
+        description: "Skip (with a warning) instead of failing when a Cloudflare edge rule answers 403 to the runner"
+        required: false
+        type: boolean
+        default: true
   workflow_call:
     inputs:
       target_url:
@@ -22,6 +27,11 @@ on:
         required: false
         type: string
         default: ""
+      skip_on_edge_block:
+        description: "Skip (with a warning) instead of failing when a Cloudflare edge rule answers 403 to the runner"
+        required: false
+        type: boolean
+        default: false
 permissions:
   contents: read
 
@@ -51,13 +61,32 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen
 
+      - name: Probe edge reachability
+        id: edge
+        env:
+          PUBLIC_MCP_URL: ${{ inputs.target_url || 'https://vehicle-mcp.chhlatbot.com/mcp' }}
+          SKIP_ON_EDGE_BLOCK: ${{ inputs.skip_on_edge_block }}
+        run: |
+          headers="$(curl -s -S -m 15 -o /dev/null -D - -X POST "${PUBLIC_MCP_URL}" \
+            -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","method":"tools/list","id":1}' || true)"
+          code="$(printf '%s' "${headers}" | awk 'toupper($1) ~ /^HTTP/ {c=$2} END {print c}')"
+          if [[ "${code}" == "403" && "${SKIP_ON_EDGE_BLOCK}" == "true" ]] \
+            && printf '%s' "${headers}" | grep -qi '^server: cloudflare'; then
+            echo "blocked=true" >> "${GITHUB_OUTPUT}"
+            echo "::warning::Cloudflare answered 403 to the GitHub runner for ${PUBLIC_MCP_URL}; smoke skipped. Run scripts/smoke-public.sh from an allowed network."
+          else
+            echo "blocked=false" >> "${GITHUB_OUTPUT}"
+          fi
+
       - name: Run public smoke verification
+        if: steps.edge.outputs.blocked != 'true'
         env:
           PUBLIC_MCP_URL: ${{ inputs.target_url || 'https://vehicle-mcp.chhlatbot.com/mcp' }}
         run: |
           bash scripts/smoke-public.sh
 
       - name: Run public security probes
+        if: steps.edge.outputs.blocked != 'true'
         env:
           PUBLIC_MCP_URL: ${{ inputs.target_url || 'https://vehicle-mcp.chhlatbot.com/mcp' }}
           PUBLIC_MCP_DIRECT_ORIGIN_HOST: ${{ inputs.direct_origin_host }}
