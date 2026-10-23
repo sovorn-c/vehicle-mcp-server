@@ -1,0 +1,7 @@
+# actionlint lags GitHub's `job` context, which documents workflow_repository and
+# workflow_sha for checking out a reusable workflow's own source.
+paths:
+  .github/workflows/public-smoke.yml:
+    ignore:
+      - 'property "workflow_repository" is not defined in object type'
+      - 'property "workflow_sha" is not defined in object type'

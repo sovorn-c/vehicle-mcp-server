@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 PUBLIC_MCP_URL="${PUBLIC_MCP_URL:-http://127.0.0.1:8080/mcp}"
+PUBLIC_MCP_DIRECT_ORIGIN_HOST="${PUBLIC_MCP_DIRECT_ORIGIN_HOST:-vehicle-mcp-server.sandbox.northflank.app}"
 
 MODE="journey"
 if [[ "${1:-}" == "--security" ]]; then
@@ -23,6 +24,7 @@ echo "=================================================================="
 echo " Vehicle Intelligence MCP Server — Public Endpoint Verification"
 echo "=================================================================="
 echo "Target URL:  ${PUBLIC_MCP_URL}"
+echo "Direct origin host: ${PUBLIC_MCP_DIRECT_ORIGIN_HOST}"
 echo "Mode:        ${MODE}"
 
 IS_REMOTE=false
@@ -97,7 +99,7 @@ if [[ "${MODE}" == "security" ]]; then
         # 4. Direct-origin bypass attempt using generated cloud domain
         DIRECT_ORIGIN_CODE=$(curl -s -S --connect-timeout 5 --max-time 10 -o /dev/null -w "%{http_code}" \
             -X POST "${PUBLIC_MCP_URL}" \
-            -H "Host: vehicle-mcp-server.sandbox.northflank.app" \
+            -H "Host: ${PUBLIC_MCP_DIRECT_ORIGIN_HOST}" \
             -H "Content-Type: application/json" \
             -d '{"jsonrpc":"2.0","method":"tools/list","id":1}' 2>&1 || true)
         if [[ "${DIRECT_ORIGIN_CODE}" != "400" && "${DIRECT_ORIGIN_CODE}" != "403" && "${DIRECT_ORIGIN_CODE}" != "421" ]]; then
